@@ -23,7 +23,7 @@ jobs:
       # Generates a BoM and uploads it to OWASP Dependency Track
       - name: Generates BoM and upload to OWASP DTrack
         id: riskscoreFromDT
-        uses:  Quobis/action-owasp-dependecy-track-check@v0.1
+        uses:  Quobis/action-owasp-dependecy-track-check@main
         with:
           url: 'https://dtrack.quobis.com'
           key: 'rfmHTYrLrikmrTMAOqiEyLNjitQX0XOF'
