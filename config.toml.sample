@@ -1,0 +1,53 @@
+#
+# XMPP server
+#
+# The xmpp section holds all configuration related to the XMPP
+# protocol.  This includes information about the server to which this
+# component connects and the way this component interprets/generates
+# XMPP stanzas.
+# Parameters:
+# - name: domain name under which this component will operate.
+#           This must match the component's domain name in your XMPP server.
+#           Otherwise, the component handshake will fail.
+# - secret: secret shared with the XMPP server.  This must
+#           match the secret configured in the XMPP server.
+# - host: domain name or IP address of the XMPP server to which
+#           this component connects.
+# - port: port on which the XMPP server is listening for components. Prosody defaults to 5347
+[xmpp]
+name="mqtt.anton.gal"
+secret="mysecretcomponentpassword"
+host="127.0.0.1"
+port=5347
+#
+# MQTT broker details
+#
+# The MQTT section provides the credentials and the URI to 
+# access the MQTT broker
+# Parameters:
+# - host: IP address of the network interface on which to listen
+#           for MQTT requests.
+# - port: port on which to listen for MQTT requests.
+[mqtt]
+broker="localhost"
+port=1883
+clientID="clientGateway"
+username="emqx"
+passwrod="secretmqtt"
+
+#
+#Sippo Server
+#
+# The sipposerver section includes the necessary configuration details for
+# the service to make requests to the Sippo server.
+# Parameters:
+# - host: address of the Sippo server to which
+#           this service makes requests.
+# - user: admin user URI (username@domain) used to identify the service
+#           against the Sippo server. Must be an administrator user in order
+#           to retrieve all meetings.
+# - password: password associated with the user.
+[sipposerver]
+host="https://web.sippo"
+user="admin@quobis"
+password="myadminpassword"
