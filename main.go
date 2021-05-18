@@ -11,9 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sheenobu/go-xco"
 	//p "xmpp-gateway/providers"
-	//"github.com/BurntSushi/toml"
-	//"github.com/pkg/errors"
-	//"github.com/sheenobu/go-xco"
 )
 
 type StaticConfig struct {
@@ -23,7 +20,7 @@ type StaticConfig struct {
 	//	provider  p.Provider
 	xmppComponent Component
 
-	rxMqttCh chan *mqtt.Message
+	rxMqttCh chan mqtt.Message
 	rxXmppCh chan *xco.Message
 }
 
@@ -40,6 +37,7 @@ var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err
 	fmt.Printf("Connection against MQTT broker lost: %v", err)
 } */
 
+// ANTON the code inside this func should be in a goroutine
 func processStanza(stanza string) {
 	if len(stanza) == 0 {
 		fmt.Printf("Not processing empty stanza! ")
@@ -94,7 +92,7 @@ func main() {
 
 	//sc.rxHttpCh = make(chan p.RxHttp)
 	sc.rxXmppCh = make(chan *xco.Message)
-	sc.rxMqttCh = make(chan *mqtt.Message)
+	sc.rxMqttCh = make(chan mqtt.Message)
 
 	// start goroutines
 	gatewayDead := sc.runGatewayProcess()
@@ -165,8 +163,7 @@ func (sc *StaticConfig) setSippoServer() (*SippoClient, error) {
 func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 	healthCh := make(chan struct{})
 
-	//go func(rxHttpCh <-chan p.RxHttp, , rxMqttCh <- chan *mqtt.Message) {
-	go func(rxXmppCh <-chan *xco.Message, rxMqttCh <-chan *mqtt.Message) {
+	go func(rxXmppCh <-chan *xco.Message, rxMqttCh <-chan mqtt.Message) {
 		defer func() {
 			recover()
 			close(healthCh)
@@ -180,6 +177,8 @@ func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 				processStanza(rxXmpp.Body)
 			case rxMqtt := <-rxMqttCh:
 				log.Println("Mqtt message received: ", rxMqtt) //ANTON
+				log.Println("Mqtt message received with topic: ", rxMqtt.Topic())
+				log.Println("Mqtt message received with payload: ", rxMqtt.Payload())
 
 			}
 
