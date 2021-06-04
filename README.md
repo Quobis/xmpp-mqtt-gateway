@@ -10,7 +10,7 @@ This gateway consists of a main routine which receives the messages from channel
 ## Dependencies
 - MQTT library: https://github.com/eclipse/paho.mqtt.golang
 - XMPP library: https://github.com/sheenobu/go-xco
-## Aknowledgement
 
-This project has been funded by ITEA3 Scratch project.
+## Aknowledgement
+This project has been developed within the ITEA3 Scratch project.
 
