@@ -230,7 +230,7 @@ func (sc *StaticConfig) runMqttProcess() <-chan struct{} {
 		ClientID:  sc.config.Mqtt.ClientID,
 		gatewayRx: sc.rxMqttCh,
 	}
-	fmt.Println("STarting MQTT client")
+	fmt.Println("Starting MQTT client")
 	return c.runMqttClient(sc)
 }
 
