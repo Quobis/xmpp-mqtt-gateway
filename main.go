@@ -44,7 +44,7 @@ func processStanza(stanza string) {
 	}
 
 	// If get values <device>
-	// mqttSub() to <device>
+	// mqtt() to <device>
 	//
 
 }
@@ -230,6 +230,7 @@ func (sc *StaticConfig) runMqttProcess() <-chan struct{} {
 		ClientID:  sc.config.Mqtt.ClientID,
 		gatewayRx: sc.rxMqttCh,
 	}
+	fmt.Println("STarting MQTT client")
 	return c.runMqttClient(sc)
 }
 

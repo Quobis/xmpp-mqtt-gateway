@@ -26,23 +26,25 @@ type mqttClient struct {
 	gatewayRx chan<- mqtt.Message
 }
 
-func (c *mqttClient) mqttSub(topic string) {
-	//topic := "topic/test"
-	if len(topic) == 0 {
-		fmt.Printf("Not subscribing to empty topic! ")
-	}
-	fmt.Printf("Subscribing to topic %s", topic)
-	token := c.Client.Subscribe(topic, 1, nil)
-	//waiting in gotoutine to minimize blocking
-	go func() {
-		<-token.Done()
-		if token.Error() != nil {
-			log.Print(token.Error()) // Use your preferred logging technique (or just fmt.Printf)
-		}
-	}()
+// func (c *mqttClient) mqttSub(topic string) {
+// 	//topic := "topic/test"
+// 	if len(topic) == 0 {
+// 		fmt.Printf("Not subscribing to empty topic! ")
+// 	}
+// 	fmt.Printf("Subscribing to topic %s", topic)
+// 	fmt.Println(c, "\t", pa, "\n")
 
-	fmt.Printf("Subscribed to topic %s", topic)
-}
+// 	token := c.Client.Subscribe(topic, 1, nil)
+// 	//waiting in gotoutine to minimize blocking
+// 	go func() {
+// 		<-token.Done()
+// 		if token.Error() != nil {
+// 			log.Print(token.Error()) // Use your preferred logging technique (or just fmt.Printf)
+// 		}
+// 	}()
+
+// 	fmt.Printf("Subscribed to topic %s", topic)
+// }
 
 // func (c *mqttClient) messagePubHandler mqtt.messagePubHandler =  (c *mqttClient) func (client mqtt.Client, msg mqtt.Message) {
 // 	fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
@@ -86,7 +88,8 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 	}
 
 	//Subscribe to Scratch project topic - To Be improved
-	c.mqttSub("scratch")
+	//c.mqttSub("scratch")
+	fmt.Println("Inside runMqttClient")
 
 	healthCh := make(chan struct{})
 	go func() {
@@ -94,10 +97,11 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 			recover()
 			close(healthCh)
 		}()
-
+		fmt.Println("Connecting to MQTT broker")
 		if token := c.Client.Connect(); token.Wait() && token.Error() != nil {
 			panic(token.Error())
 		}
+		fmt.Println("Connected to MQTT broker")
 
 	}()
 	return healthCh
