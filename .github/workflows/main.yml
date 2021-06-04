@@ -3,8 +3,13 @@
 name: CI
 
 # Controls when the action will run. 
-on: [push]
-
+on: 
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - '**.md'
+      
   # Allows you to run this workflow manually from the Actions tab
   # workflow_dispatch:
 
@@ -26,7 +31,7 @@ jobs:
         uses:  Quobis/action-owasp-dependecy-track-check@main
         with:
           url: 'https://dtrack.quobis.com'
-          key: 'rfmHTYrLrikmrTMAOqiEyLNjitQX0XOF'
+          key: '${{ secrets.SECRET_OWASP_DT_KEY }'
           language: 'golang'
       
       # Show the risk score output 
