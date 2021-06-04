@@ -176,9 +176,9 @@ func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 				log.Println("Xmpp stanza received: ", rxXmpp.Body)
 				processStanza(rxXmpp.Body)
 			case rxMqtt := <-rxMqttCh:
-				log.Println("Mqtt message received: ", rxMqtt) //ANTON
-				log.Println("Mqtt message received with topic: ", rxMqtt.Topic())
-				log.Println("Mqtt message received with payload: ", rxMqtt.Payload())
+				log.Println("MQTT message received: ", rxMqtt) //ANTON
+				log.Println("MQTT message received with topic: ", rxMqtt.Topic())
+				log.Println("MQTT message received with payload: ", rxMqtt.Payload())
 
 			}
 
