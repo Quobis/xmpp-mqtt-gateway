@@ -22,8 +22,7 @@ type mqttClient struct {
 	messagePubHandler  mqtt.MessageHandler
 	connectHandler     mqtt.OnConnectHandler
 	connectLostHandler mqtt.ConnectionLostHandler
-
-	gatewayRx chan<- mqtt.Message
+	gatewayRx          chan<- *mqtt.Message
 }
 
 // func (c *mqttClient) mqttSub(topic string) {
@@ -75,7 +74,7 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 
 	c.messagePubHandler = func(client mqtt.Client, msg mqtt.Message) {
 		fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
-		go func() { c.gatewayRx <- msg }()
+		go func() { c.gatewayRx <- &msg }()
 		//ANTON: prepare XMPP message including this information back
 	}
 
@@ -84,7 +83,7 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 	}
 
 	c.connectLostHandler = func(client mqtt.Client, err error) {
-		fmt.Printf("Connection against MQTT broker lost dut to error: %v", err)
+		fmt.Printf("Connection against MQTT broker lost due to error: %v", err)
 	}
 
 	//Subscribe to Scratch project topic - To Be improved

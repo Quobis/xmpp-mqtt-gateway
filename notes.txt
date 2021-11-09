@@ -1,0 +1,2 @@
+docker run -it -p 1883:1883 -p 9001:9001 -v /home/antonroman/src/xmpp-mqtt-gateway/mosquitto-conf/mosquitto.conf:/mosquitto/config/mosquitto.conf  eclipse-mosquitto
+docker run --name prosody -p 5222:5222 -p 5347:5347 -v /home/antonroman/src/xmpp-mqtt-gateway/prosody-conf/prosody.cfg.lua:/etc/prosody/prosody.cfg.lua:ro -v /home/antonroman/src/xmpp-mqtt-gateway/prosody-conf/certs:/etc/prosody/certs:ro prosody-anton

@@ -20,7 +20,7 @@ type StaticConfig struct {
 	//	provider  p.Provider
 	xmppComponent Component
 
-	rxMqttCh chan mqtt.Message
+	rxMqttCh chan *mqtt.Message
 	rxXmppCh chan *xco.Message
 }
 
@@ -92,7 +92,7 @@ func main() {
 
 	//sc.rxHttpCh = make(chan p.RxHttp)
 	sc.rxXmppCh = make(chan *xco.Message)
-	sc.rxMqttCh = make(chan mqtt.Message)
+	sc.rxMqttCh = make(chan *mqtt.Message)
 
 	// start goroutines
 	gatewayDead := sc.runGatewayProcess()
@@ -163,7 +163,7 @@ func (sc *StaticConfig) setSippoServer() (*SippoClient, error) {
 func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 	healthCh := make(chan struct{})
 
-	go func(rxXmppCh <-chan *xco.Message, rxMqttCh <-chan mqtt.Message) {
+	go func(rxXmppCh <-chan *xco.Message, rxMqttCh <-chan *mqtt.Message) {
 		defer func() {
 			recover()
 			close(healthCh)
@@ -176,9 +176,9 @@ func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 				log.Println("Xmpp stanza received: ", rxXmpp.Body)
 				processStanza(rxXmpp.Body)
 			case rxMqtt := <-rxMqttCh:
-				log.Println("MQTT message received: ", rxMqtt) //ANTON
-				log.Println("MQTT message received with topic: ", rxMqtt.Topic())
-				log.Println("MQTT message received with payload: ", rxMqtt.Payload())
+				log.Println("MQTT message received: ", *rxMqtt) //ANTON
+				log.Println("MQTT message received with topic: ", (*rxMqtt).Topic())
+				log.Println("MQTT message received with payload: ", (*rxMqtt).Payload())
 
 			}
 
