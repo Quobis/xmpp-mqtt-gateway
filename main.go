@@ -1,15 +1,21 @@
+/*
+This file defines the main behaviour of the gateway
+*/
+
 package main
 
 import (
 	"fmt"
 	"log"
 	"os"
+
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/pkg/errors"
-	"github.com/sheenobu/go-xco"
+	xco "github.com/sheenobu/go-xco"
 	//p "xmpp-gateway/providers"
 )
 
@@ -19,39 +25,118 @@ type StaticConfig struct {
 
 	//	provider  p.Provider
 	xmppComponent Component
+	mqttClient    mqttClient
 
 	rxMqttCh chan *mqtt.Message
 	rxXmppCh chan *xco.Message
+
+	//mqttMessageStack map[string][]string
+	//xmppMessageStack map[*xco.Address]string
+
+	xmppMessageStack []xmppPair
+	mqttMessageStack []mqttPair
 }
 
-/* var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
-	fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
-	//ANTON: prepare XMPP message including this information back
+type xmppPair struct {
+	from  *xco.Address
+	topic string
 }
 
-var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
-	fmt.Println("Connected to MQTT broker")
+type mqttPair struct {
+	topic   string
+	content string
 }
 
-var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
-	fmt.Printf("Connection against MQTT broker lost: %v", err)
-} */
+// type xmppMessageQueue struct {
+
+// 	from	*xco.Address
+// 	topic	string
+
+// 	func get
+
+// }
 
 // ANTON the code inside this func should be in a goroutine
-func processStanza(stanza string) {
-	if len(stanza) == 0 {
+func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
+
+	topic := "/smartgrid/"
+
+	if len(stanza.Body) == 0 {
 		fmt.Printf("Not processing empty stanza! ")
+		return nil
 	}
 
-	// If get values <device>
-	// mqtt() to <device>
-	//
+	body_raw := strings.Split(stanza.Body, " ")
+	switch body_raw[1] { //the second word makes the difference
 
+	//GET variable1 from device1
+	case "variable":
+
+		topic = topic + body_raw[3] + "/" + body_raw[1]
+
+	//GET devices
+	case "devices":
+
+		topic = topic + "listOfDevices"
+
+	//GET values device1
+	case "values":
+
+		topic = topic + body_raw[2]
+	}
+
+	if !sc.checkSubscribed(xmppPair{stanza.From, topic}) {
+
+		//storing message on the slice
+		sc.xmppMessageStack = append(sc.xmppMessageStack, xmppPair{stanza.From, topic})
+
+		return sc.mqttClient.mqttSub(topic)
+
+	}
+
+	//if not subscribed, xmpp client get response from the already subscribed topic
+
+	xgwAdr := &xco.Address{
+		LocalPart:  sc.config.Xmpp.Host,
+		DomainPart: sc.config.Xmpp.Name,
+	}
+
+	returnStanza := sc.xmppComponent.createStanza(xgwAdr, stanza.From, sc.getMessage(topic))
+
+	return sc.xmppComponent.xmppComponent.Send(returnStanza)
+
+}
+
+func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
+
+	topic := (*message).Topic()
+
+	err := sc.mqttClient.mqttPublish(string((*message).Payload()), (*message).Topic())
+
+	//appending the message to the mqttStack
+	sc.mqttMessageStack = append(sc.mqttMessageStack, mqttPair{(*message).Topic(), string((*message).Payload())})
+
+	xgwAdr := &xco.Address{
+		LocalPart:  sc.config.Xmpp.Host,
+		DomainPart: sc.config.Xmpp.Name,
+	}
+
+	//getting all the addresses subscribed to a topic and creating stanzas to answer back
+	for _, value := range sc.getAddresses(topic) {
+
+		stanza := sc.xmppComponent.createStanza(xgwAdr, value, string((*message).Payload()))
+
+		err = sc.xmppComponent.xmppComponent.Send(stanza)
+
+	}
+
+	return err
 }
 
 func main() {
 
 	var config Config
+
 	_, err := toml.DecodeFile(os.Args[1], &config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "can't read config file '%s': %s\n", os.Args[1], err)
@@ -64,32 +149,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	//MQTT part
-	// var broker = sc.config.Mqtt.Broker
-	// var port = sc.config.Mqtt.Port
-	// opts := mqtt.NewClientOptions()
-	// opts.AddBroker(fmt.Sprintf("tcp://%s:%d", broker, port))
-	// opts.SetClientID("go_mqtt_client")
-	// opts.SetUsername("emqx")
-	// opts.SetPassword("public")
-	// opts.SetDefaultPublishHandler(messagePubHandler)
-	// opts.OnConnect = connectHandler
-	// opts.OnConnectionLost = connectLostHandler
-	// client := mqtt.NewClient(opts)
-
-	// if token := client.Connect(); token.Wait() && token.Error() != nil {
-	// 	panic(token.Error())
-	// }
-
-	// mqttSub(client, "smartgrid/listOfDevices")
-	/* 	t := client.Publish("topic", qos, retained, msg)
-	   	go func() {
-	   		_ = t.Wait() // Can also use '<-t.Done()' in releases > 1.2.0
-	   		if t.Error() != nil {
-	   			log.Error(t.Error()) // Use your preferred logging technique (or just fmt.Printf)
-	   		}
-	   	}() */
-
 	//sc.rxHttpCh = make(chan p.RxHttp)
 	sc.rxXmppCh = make(chan *xco.Message)
 	sc.rxMqttCh = make(chan *mqtt.Message)
@@ -98,7 +157,43 @@ func main() {
 	gatewayDead := sc.runGatewayProcess()
 	xmppDead := sc.runXmppProcess()
 	mqttDead := sc.runMqttProcess()
+
+	//sc.mqttClient.mqttSub("example")
+
 	// httpDead := sc.runHttpProcess()
+
+	// xmensaje := &xco.Message{
+	// 	XMLName: xml.Name{
+	// 		Local: "message",
+	// 		Space: "jabber:component:accept",
+	// 	},
+
+	// 	Header: xco.Header{
+	// 		From: &xco.Address{
+	// 			LocalPart:  "user",
+	// 			DomainPart: "domain",
+	// 		},
+	// 		To: &xco.Address{
+	// 			LocalPart:  "222222222",
+	// 			DomainPart: "wa.quobis",
+	// 		},
+	// 		ID: NewId(),
+	// 	},
+	// 	Type: "chat",
+	// 	Body: "Hello world"}
+
+	// if sc.processStanza(xmensaje) == nil {
+	// 	fmt.Println("Empty message or bad formatting")
+	// }
+
+	// fmt.Printf("\nsc.xmppComponent.Name: %s", sc.xmppComponent.Name)
+	// fmt.Printf("\nsc.mqttClient.Username: %s", sc.mqttClient.Username)
+	// fmt.Printf("\n*xmensaje.From: %s", *xmensaje.From)
+	// fmt.Printf("\nsc.config.Mqtt.ClientID: %s", sc.config.Mqtt.ClientID)
+	// fmt.Printf("\nsc.config.Mqtt.Broker: %s", sc.config.Mqtt.Broker)
+	// fmt.Printf("\nsc.config.Mqtt.Port: %d", sc.config.Mqtt.Port)
+	// fmt.Printf("\nsc.config.Mqtt.Username: %s", sc.config.Mqtt.Username)
+
 	for {
 		select {
 		//case _ = <-gatewayDead: ANTON
@@ -133,33 +228,6 @@ func (sc *StaticConfig) setSippoServer() (*SippoClient, error) {
 	return nil, errors.New("Need to configure Sippo Server")
 }
 
-/* func (sc *StaticConfig) runHttpProcess() <-chan struct{} {
-
-	provider, err := sc.getProvider()
-	if err != nil {
-		msg := fmt.Sprintf("Couldn't choose a provider: %s", err)
-		panic(msg)
-	}
-
-	return provider.RunHttpServer()
-} */
-
-/* func (sc *StaticConfig) getProvider() (p.Provider, error) {
-	if sc.config.Vonage != nil {
-		vonage := &p.Vonage{
-			Endpoint: sc.config.Vonage.Endpoint,
-			Token:    sc.config.Vonage.Token,
-			Number:   sc.config.Vonage.Number,
-			Host:     sc.config.Vonage.Host,
-			Port:     sc.config.Vonage.Port,
-			RxHttpCh: sc.rxHttpCh,
-		}
-		sc.provider = vonage
-		return vonage, nil
-	}
-	return nil, errors.New("Need to configure a provider")
-} */
-
 func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 	healthCh := make(chan struct{})
 
@@ -174,39 +242,26 @@ func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 			select {
 			case rxXmpp := <-rxXmppCh:
 				log.Println("Xmpp stanza received: ", rxXmpp.Body)
-				processStanza(rxXmpp.Body)
+
+				err := sc.processStanza(rxXmpp)
+				if err != nil {
+					log.Printf("Error receiving xmpp msg: %s", err)
+				}
+
 			case rxMqtt := <-rxMqttCh:
 				log.Println("MQTT message received: ", *rxMqtt) //ANTON
 				log.Println("MQTT message received with topic: ", (*rxMqtt).Topic())
 				log.Println("MQTT message received with payload: ", (*rxMqtt).Payload())
 
-			}
+				err := sc.mqttToStanza(rxMqtt)
 
-			/* 	select {
-				case rxHttp := <-rxHttpCh:
-			log.Println("Http message")
-			errCh := rxHttp.ErrCh()
-			switch msg := rxHttp.(type) {
-			case *p.VonageInboundRequest:
-				log.Println("Inbound Message")
-				_, err := sc.whatsapp2Stanza(msg)
-				errCh <- err
-			case *p.VonageStatusRequest:
-				log.Println("Status Message")
-				errCh <- nil
-			default:
-				log.Printf("unexpected type: %#v", rxHttp)
+				if err != nil {
+					log.Printf("Error receiving mqtt msg: %s", err)
+				}
+
 			}
-			case rxXmpp := <-rxXmppCh:
-				log.Println("Xmpp stanza received: ", rxXmpp.Body)
-				//err := sc.stanza2whatsapp(rxXmpp)
-				// if err != nil {
-				// 	log.Printf("Error: %s", err)
-				// }
-			} */
 			log.Println("gateway looping")
 		}
-		//}(sc.rxHttpCh, sc.rxXmppCh)
 	}(sc.rxXmppCh, sc.rxMqttCh)
 
 	return healthCh
@@ -219,6 +274,7 @@ func (sc *StaticConfig) runXmppProcess() <-chan struct{} {
 		Address:   fmt.Sprintf("%s:%d", sc.config.Xmpp.Host, sc.config.Xmpp.Port),
 		gatewayRx: sc.rxXmppCh,
 	}
+	fmt.Println("Starting XMPP client process")
 	return c.runXmppComponent(sc)
 }
 
@@ -234,51 +290,37 @@ func (sc *StaticConfig) runMqttProcess() <-chan struct{} {
 	return c.runMqttClient(sc)
 }
 
-/* func (sc *StaticConfig) whatsapp2Stanza(whatsapp *p.VonageInboundRequest) (*xco.Message, error) {
+func (sc *StaticConfig) checkSubscribed(pair xmppPair) bool {
 
-	stanzaTo, err := sc.getRecipientAddress(whatsapp.From.Number)
+	for _, value := range sc.xmppMessageStack {
 
-	if err != nil {
-		return nil, errors.Wrap(err, "retrieving recipient for message")
+		if value.topic == pair.topic && value.from == pair.from {
+			return true
+		}
 	}
-
-	stanzaFrom, err := sc.phone2Address(whatsapp.From.Number)
-	if err != nil {
-		return nil, errors.Wrap(err, "converting address from phone number")
-	}
-
-	stanza := createStanza(stanzaFrom, stanzaTo, whatsapp.Message.Content.Text)
-
-	err = sc.component.xmppComponent.Send(stanza)
-	return stanza, errors.Wrap(err, "sending stanza")
+	return false
 }
 
-func (sc *StaticConfig) stanza2whatsapp(stanza *xco.Message) error {
-	return sc.provider.Send(stanza.To.LocalPart, "text", stanza.Body)
+func (sc *StaticConfig) getAddresses(topic string) []*xco.Address {
+
+	addresses := []*xco.Address{}
+
+	for _, value := range sc.xmppMessageStack {
+
+		if value.topic == topic {
+			addresses = append(addresses, value.from)
+		}
+	}
+	return addresses
 }
 
-func (sc *StaticConfig) getRecipientAddress(phoneNumber string) (*xco.Address, error) {
-	token, err := sc.sippoClient.getAuthToken()
+func (sc *StaticConfig) getMessage(topic string) string {
 
-	if err != nil {
-		return nil, errors.Wrap(err, "converting address from phone number")
-	}
-	m, err := sc.sippoClient.GetMeetingsByPhone(token.AccessToken, phoneNumber)
+	for _, value := range sc.mqttMessageStack {
 
-	if err != nil {
-		return nil, errors.Wrap(err, "retrieving meetings")
+		if value.topic == topic {
+			return value.content
+		}
 	}
-	addr := &xco.Address{
-		LocalPart:  m[len(m)-1].User.Username,
-		DomainPart: m[len(m)-1].User.Domain,
-	}
-	return addr, nil
-} */
-
-/* func (sc *StaticConfig) phone2Address(phoneNumber string) (*xco.Address, error) {
-	addr := &xco.Address{
-		LocalPart:  phoneNumber,
-		DomainPart: sc.component.Name,
-	}
-	return addr, nil
-} */
+	return ""
+}

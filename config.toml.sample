@@ -18,7 +18,7 @@
 name="mqtt.anton.gal"
 secret="mysecretcomponentpassword"
 host="127.0.0.1"
-port=5347
+port=5280
 #
 # MQTT broker details
 #
@@ -32,8 +32,8 @@ port=5347
 broker="localhost"
 port=1883
 clientID="clientGateway"
-username="emqx"
-passwrod="secretmqtt"
+username="guest"
+password="guest"
 
 #
 #Sippo Server

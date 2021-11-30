@@ -25,38 +25,38 @@ type mqttClient struct {
 	gatewayRx          chan<- *mqtt.Message
 }
 
-// func (c *mqttClient) mqttSub(topic string) {
-// 	//topic := "topic/test"
-// 	if len(topic) == 0 {
-// 		fmt.Printf("Not subscribing to empty topic! ")
-// 	}
-// 	fmt.Printf("Subscribing to topic %s", topic)
-// 	fmt.Println(c, "\t", pa, "\n")
+func (c *mqttClient) mqttSub(topic string) error {
+	if len(topic) == 0 {
+		fmt.Printf("Not subscribing to empty topic! ")
+	}
+	fmt.Printf("Subscribing to topic %s", topic)
 
-// 	token := c.Client.Subscribe(topic, 1, nil)
-// 	//waiting in gotoutine to minimize blocking
-// 	go func() {
-// 		<-token.Done()
-// 		if token.Error() != nil {
-// 			log.Print(token.Error()) // Use your preferred logging technique (or just fmt.Printf)
-// 		}
-// 	}()
+	//fmt.Sprintf("%s",string(c.Client.IsConnected()))
 
-// 	fmt.Printf("Subscribed to topic %s", topic)
-// }
+	token := c.Client.Subscribe(topic, 1, nil)
+	//waiting in gotoutine to minimize blocking
+	//<-token.Done() is provided for use in select statements. Simple use cases may
+	// use Wait or WaitTimeout.
+	go func() {
+		<-token.Done()
+		//blocking the goroutine
+		if token.Error() != nil {
+			log.Print(token.Error())
+		}
+	}()
 
-// func (c *mqttClient) messagePubHandler mqtt.messagePubHandler =  (c *mqttClient) func (client mqtt.Client, msg mqtt.Message) {
-// 	fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
-// 	//ANTON: prepare XMPP message including this information back
-// } */
+	fmt.Printf("Subscribed to topic %s, with token %s", topic, token)
 
-// func (c *mqttClient) connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
-// 	fmt.Println("Connected to MQTT broker")
-// }
+	return token.Error()
+}
 
-// func (c *mqttClient) connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
-// 	fmt.Printf("Connection against MQTT broker lost: %v", err)
-// }
+func (c *mqttClient) mqttPublish(message, topic string) error {
+
+	token := c.Client.Publish(topic, 1, false, message)
+	//waits indefinetly until the message is sent to the broker and ack back to the client
+	token.Wait()
+	return token.Error()
+}
 
 func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 	opts := mqtt.NewClientOptions()
@@ -76,15 +76,24 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 		fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
 		go func() { c.gatewayRx <- &msg }()
 		//ANTON: prepare XMPP message including this information back
+
 	}
+
+	opts.SetDefaultPublishHandler(c.messagePubHandler)
 
 	c.connectHandler = func(client mqtt.Client) {
 		fmt.Println("Connected to MQTT broker")
 	}
 
+	opts.OnConnect = c.connectHandler
+
 	c.connectLostHandler = func(client mqtt.Client, err error) {
 		fmt.Printf("Connection against MQTT broker lost due to error: %v", err)
 	}
+
+	opts.OnConnectionLost = c.connectLostHandler
+
+	c.Client = mqtt.NewClient(opts)
 
 	//Subscribe to Scratch project topic - To Be improved
 	//c.mqttSub("scratch")
@@ -101,6 +110,8 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 			panic(token.Error())
 		}
 		fmt.Println("Connected to MQTT broker")
+
+		c.Client.Subscribe("example", 1, nil)
 
 	}()
 	return healthCh

@@ -1,3 +1,8 @@
+/*
+This file contains methods for error handling, generating and dealing with stanzas,
+and creating new ids for the xmpp component
+*/
+
 package main
 
 import (
@@ -8,7 +13,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/sheenobu/go-xco"
+	xco "github.com/sheenobu/go-xco"
 )
 
 type Component struct {
@@ -51,7 +56,7 @@ func (c *Component) runXmppComponent(sc *StaticConfig) <-chan struct{} {
 	return healthCh
 }
 
-/* func createStanza(from, to *xco.Address, body string) *xco.Message {
+func (c *Component) createStanza(from, to *xco.Address, body string) *xco.Message {
 	msg := &xco.Message{
 		XMLName: xml.Name{
 			Local: "message",
@@ -67,7 +72,7 @@ func (c *Component) runXmppComponent(sc *StaticConfig) <-chan struct{} {
 		Body: body,
 	}
 	return msg
-} */
+}
 
 func (c *Component) onMessage(x *xco.Component, m *xco.Message) error {
 	log.Printf("Message: %+v, To: %s", m, m.To.LocalPart)

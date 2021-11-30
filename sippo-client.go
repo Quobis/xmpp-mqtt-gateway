@@ -1,3 +1,7 @@
+/*
+This files interacts with the API rest to make petitions like searching some user
+*/
+
 package main
 
 import (
