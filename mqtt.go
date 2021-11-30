@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
@@ -112,6 +114,13 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 		fmt.Println("Connected to MQTT broker")
 
 		c.Client.Subscribe("example", 1, nil)
+
+		//with this we keep the client connected until a SIGTERM
+		//signal is received
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+		<-sigs
+		c.Client.Disconnect(250)
 
 	}()
 	return healthCh
