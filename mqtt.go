@@ -31,32 +31,34 @@ func (c *mqttClient) mqttSub(topic string) error {
 	if len(topic) == 0 {
 		fmt.Printf("Not subscribing to empty topic! ")
 	}
-	fmt.Printf("Subscribing to topic %s", topic)
-
-	//fmt.Sprintf("%s",string(c.Client.IsConnected()))
+	fmt.Printf("Subscribing to topic %s\n", topic)
 
 	token := c.Client.Subscribe(topic, 1, nil)
-	//waiting in gotoutine to minimize blocking
-	//<-token.Done() is provided for use in select statements. Simple use cases may
-	// use Wait or WaitTimeout.
-	go func() {
-		<-token.Done()
-		//blocking the goroutine
-		if token.Error() != nil {
-			log.Print(token.Error())
-		}
-	}()
 
-	fmt.Printf("Subscribed to topic %s, with token %s", topic, token)
+	// go func() {
+	// 	<-token.Done()
+	// 	//blocking the goroutine
+	// 	if token.Error() != nil {
+	// 		log.Print(token.Error())
+	// 	}
+	// }()
+
+	//token.Wait()
+	fmt.Printf("\nClient %s, \nsubscribed to topic %s", c.Username, topic)
 
 	return token.Error()
 }
 
 func (c *mqttClient) mqttPublish(message, topic string) error {
 
-	token := c.Client.Publish(topic, 1, false, message)
+	fmt.Sprintf("\nPublishing to topic: %s", topic)
+
+	token := c.Client.Publish(topic, 0, false, message)
 	//waits indefinetly until the message is sent to the broker and ack back to the client
+
 	token.Wait()
+	fmt.Sprintf("Published %s,\nwith topic: %s", message, topic)
+
 	return token.Error()
 }
 
@@ -66,7 +68,7 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 	mqtt.ERROR = log.New(os.Stdout, "[ERROR] ", 0)
 	mqtt.CRITICAL = log.New(os.Stdout, "[CRIT] ", 0)
 	mqtt.WARN = log.New(os.Stdout, "[WARN]  ", 0)
-	mqtt.DEBUG = log.New(os.Stdout, "[DEBUG] ", 0)
+	//mqtt.DEBUG = log.New(os.Stdout, "[DEBUG] ", 0)
 
 	//check values!!!!
 	opts.AddBroker(fmt.Sprintf(c.Url))
@@ -75,10 +77,9 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 	opts.SetPassword(c.Password)
 
 	c.messagePubHandler = func(client mqtt.Client, msg mqtt.Message) {
-		fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
+		fmt.Printf("Received message: %s \nfrom topic: %s\n", msg.Payload(), msg.Topic())
 		go func() { c.gatewayRx <- &msg }()
 		//ANTON: prepare XMPP message including this information back
-
 	}
 
 	opts.SetDefaultPublishHandler(c.messagePubHandler)
@@ -97,9 +98,11 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 
 	c.Client = mqtt.NewClient(opts)
 
+	sc.mqttClient = *c
+
 	//Subscribe to Scratch project topic - To Be improved
 	//c.mqttSub("scratch")
-	fmt.Println("Inside runMqttClient")
+	fmt.Println("Inside runMqttClient: " + c.Username)
 
 	healthCh := make(chan struct{})
 	go func() {
@@ -108,12 +111,14 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 			close(healthCh)
 		}()
 		fmt.Println("Connecting to MQTT broker")
+
 		if token := c.Client.Connect(); token.Wait() && token.Error() != nil {
 			panic(token.Error())
 		}
-		fmt.Println("Connected to MQTT broker")
 
-		c.Client.Subscribe("example", 1, nil)
+		// c.Client.Subscribe("/smartgrid/listOfDevices", 1, nil)
+		// c.Client.Subscribe("/smartgrid/device1/variable1", 1, nil)
+		// c.Client.Subscribe("/smartgrid/device1", 1, nil)
 
 		//with this we keep the client connected until a SIGTERM
 		//signal is received

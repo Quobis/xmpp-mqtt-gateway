@@ -15,10 +15,10 @@
 #           this component connects.
 # - port: port on which the XMPP server is listening for components. Prosody defaults to 5347
 [xmpp]
-name="mqtt.anton.gal"
+name="mqtt.gateway.com"
 secret="mysecretcomponentpassword"
 host="127.0.0.1"
-port=5280
+port=5347
 #
 # MQTT broker details
 #

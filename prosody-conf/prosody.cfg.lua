@@ -1,4 +1,3 @@
-daemonize = false;
 -- Prosody XMPP Server Configuration
 --
 -- Information on configuring Prosody can be found on our
@@ -21,7 +20,7 @@ daemonize = false;
 -- for the server. Note that you must create the accounts separately
 -- (see https://prosody.im/doc/creating_accounts for info)
 -- Example: admins = { "user1@example.com", "user2@example.net" }
-admins = { "admin@anton.gal" }
+admins = { "admin@chat.gateway.com" }
 
 -- Enable use of libevent for better performance under high load
 -- For more information see: https://prosody.im/doc/libevent
@@ -86,14 +85,14 @@ modules_enabled = {
 -- to disable them then uncomment them here:
 modules_disabled = {
 	-- "offline"; -- Store offline messages
-	-- "c2s"; -- Handle client connections
-	-- "s2s"; -- Handle server-to-server connections
+	--"c2s"; -- Handle client connections
+	"s2s"; -- Handle server-to-server connections
 	-- "posix"; -- POSIX functionality, sends server to background, enables syslog, etc.
 }
 
 -- Disable account creation by default, for security
 -- For more information see https://prosody.im/doc/creating_accounts
-allow_registration = false
+allow_registration = true
 
 -- Force clients to use encrypted connections? This option will
 -- prevent clients from authenticating unless they are using encryption.
@@ -137,10 +136,10 @@ authentication = "internal_hashed"
 -- through modules. An "sql" backend is included by default, but requires
 -- additional dependencies. See https://prosody.im/doc/storage for more info.
 
---storage = "sql" -- Default is "internal"
+storage = "sql" -- Default is "internal"
 
 -- For the "sql" backend, you can uncomment *one* of the below to configure:
---sql = { driver = "SQLite3", database = "prosody.sqlite" } -- Default. 'database' is the filename.
+sql = { driver = "SQLite3", database = "prosody.sqlite" } -- Default. 'database' is the filename.
 --sql = { driver = "MySQL", database = "prosody", username = "prosody", password = "secret", host = "localhost" }
 --sql = { driver = "PostgreSQL", database = "prosody", username = "prosody", password = "secret", host = "localhost" }
 
@@ -162,6 +161,8 @@ log = {
     {levels = {min = "debug"}, to = "console"};
 }
 
+component_interfaces = { "0.0.0.0" }
+
 -- Uncomment to enable statistics
 -- For more info see https://prosody.im/doc/statistics
 -- statistics = "internal"
@@ -174,7 +175,7 @@ log = {
 -- (from e.g. Let's Encrypt) see https://prosody.im/doc/certificates
 
 -- Location of directory to find certificates in (relative to main config file):
-certificates = "certs"
+--certificates = "/etc/prosody/certs"
 
 -- HTTPS currently only supports a single certificate, specify it here:
 --https_certificate = "/etc/prosody/certs/localhost.crt"
@@ -182,11 +183,15 @@ certificates = "certs"
 ----------- Virtual hosts -----------
 -- You need to add a VirtualHost entry for each domain you wish Prosody to serve.
 -- Settings under each VirtualHost entry apply *only* to that host.
-
-VirtualHost "anton.gal"
+VirtualHost "chat.gateway.com"
+	enabled = true
+	-- ssl = {
+	-- 	key = "/etc/prosody/certs/chat.gateway.com.key";
+	-- 	certificate = "/etc/prosody/certs/chat.gateway.com.crt";
+	-- }
 
 --VirtualHost "example.com"
-	certificate = "/etc/prosody/certs/anton.crt"
+	--certificate = "/etc/prosody/certs/anton.crt"
 
 ------ Components ------
 -- You can specify components to add hosts that provide special services,
@@ -204,7 +209,12 @@ VirtualHost "anton.gal"
 -- transports to other networks like ICQ, MSN and Yahoo. For more info
 -- see: https://prosody.im/doc/components#adding_an_external_component
 --
-Component "mqtt.anton.gal"
-   component_secret = "mysecretcomponentpassword"
-   certificate = "/etc/prosody/certs/mqtt.anton.crt"
-
+Component "mqtt.gateway.com" --"muc"
+	--modules_enabled = { "mam_muc "}
+	--storage = { muc_log = "sql"}
+	component_secret = "mysecretcomponentpassword"
+	-- ssl = {
+	-- 	key = "/etc/prosody/certs/mqtt.anton.key";
+	-- 	certificate = "/etc/prosody/certs/mqtt.anton.crt"
+	-- }
+	--certificate = "/etc/prosody/certs/mqtt.anton.crt"

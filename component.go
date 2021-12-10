@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"encoding/base32"
 	"encoding/xml"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -25,12 +26,15 @@ type Component struct {
 }
 
 func (c *Component) runXmppComponent(sc *StaticConfig) <-chan struct{} {
+
 	opts := xco.Options{
 		Name:         c.Name,
 		SharedSecret: c.Secret,
 		Address:      c.Address,
 		Logger:       log.New(os.Stderr, "", log.LstdFlags),
 	}
+
+	fmt.Println("Inside XMPP client")
 
 	healthCh := make(chan struct{})
 	go func() {
@@ -44,13 +48,19 @@ func (c *Component) runXmppComponent(sc *StaticConfig) <-chan struct{} {
 			log.Printf("can't create internal XMPP component: %s", err)
 			return
 		}
+
 		x.MessageHandler = c.onMessage
 		x.PresenceHandler = c.onPresence
 		x.IqHandler = c.onIq
 		x.UnknownHandler = c.onUnknown
 		c.xmppComponent = x
 		sc.xmppComponent = *c
+
 		err = x.Run()
+
+		//exemplo
+		//x.Send(opts)
+
 		log.Printf("lost XMPP connection:%s", err)
 	}()
 	return healthCh
