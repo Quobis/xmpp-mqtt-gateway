@@ -26,3 +26,5 @@ The service will be deployed as a container, but this is still a WIP.
 ## Aknowledgement
 This project has been developed within the ITEA3 Scratch project.
 
+## Debug
+MQTT debugging is available if by uncommenting the `mqtt.DEBUG= log.New(os.Stdout, "[DEBUG] ", 0)` line on mqtt.go

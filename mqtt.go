@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
@@ -31,20 +32,19 @@ func (c *mqttClient) mqttSub(topic string) error {
 	if len(topic) == 0 {
 		fmt.Printf("Not subscribing to empty topic! ")
 	}
-	fmt.Printf("Subscribing to topic %s\n", topic)
+	fmt.Printf("Subscribing to topic %s \n", topic)
 
 	token := c.Client.Subscribe(topic, 1, nil)
 
 	// go func() {
 	// 	<-token.Done()
-	// 	//blocking the goroutine
 	// 	if token.Error() != nil {
 	// 		log.Print(token.Error())
 	// 	}
 	// }()
 
 	//token.Wait()
-	fmt.Printf("\nClient %s, \nsubscribed to topic %s", c.Username, topic)
+	fmt.Printf("Client %s, subscribed to topic %s\n", c.Username, topic)
 
 	return token.Error()
 }
@@ -78,7 +78,9 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 
 	c.messagePubHandler = func(client mqtt.Client, msg mqtt.Message) {
 		fmt.Printf("Received message: %s \nfrom topic: %s\n", msg.Payload(), msg.Topic())
-		go func() { c.gatewayRx <- &msg }()
+		go func() {
+			c.gatewayRx <- &msg
+		}()
 		//ANTON: prepare XMPP message including this information back
 	}
 
@@ -86,12 +88,23 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 
 	c.connectHandler = func(client mqtt.Client) {
 		fmt.Println("Connected to MQTT broker")
+		// go func() {
+		// 	c.gatewayRx <- &msg
+		// }()
 	}
 
 	opts.OnConnect = c.connectHandler
 
+	timeout, _ := time.ParseDuration("10s")
+
+	opts.SetConnectTimeout(timeout)
+
+	opts.SetOrderMatters(false)
+
+	opts.AutoReconnect = false
+
 	c.connectLostHandler = func(client mqtt.Client, err error) {
-		fmt.Printf("Connection against MQTT broker lost due to error: %v", err)
+		fmt.Printf("Connection against MQTT broker lost due to error: %v\n", err)
 	}
 
 	opts.OnConnectionLost = c.connectLostHandler
