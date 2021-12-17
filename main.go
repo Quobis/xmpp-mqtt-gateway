@@ -10,7 +10,6 @@ import (
 	"log"
 	"os"
 	"reflect"
-	"strconv"
 	"time"
 
 	"strings"
@@ -47,11 +46,6 @@ type mqttPair struct {
 	content string
 }
 
-type Mensajee struct {
-	Variable string `json:variable`
-	Value    string `json:value`
-}
-
 func main() {
 
 	var config Config
@@ -75,8 +69,8 @@ func main() {
 	//Testing the subscribe to a topic before publish (not persistent message stack)
 
 	// s := mqttPair{
-	// 	"/smartgrid/listOfDevices",
-	// 	"deviceListExample",
+	// 	"smartgrid/listOfDevices",
+	// 	"deviceExample",
 	// }
 	// sc.mqttMessageStack = append(sc.mqttMessageStack, s)
 
@@ -168,7 +162,7 @@ func (sc *StaticConfig) runMqttProcess() <-chan struct{} {
 // ANTON the code inside this func should be in a goroutine
 func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 
-	topic := "/smartgrid/"
+	topic := "smartgrid/"
 
 	xgwAdr := &xco.Address{
 		DomainPart: sc.config.Xmpp.Name,
@@ -188,19 +182,23 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 		//GET variable1 from device1
 		case "variable":
 
-			topic = topic + body_raw[3] + "/" + body_raw[1]
+			topic += body_raw[3] + "/" + body_raw[1]
 
 		//GET devices
 		case "devices":
 
-			topic = topic + "listOfDevices"
+			topic += "listOfDevices"
 
-		//GET values device1
+		//GET values device
 		case "values":
 
-			topic = topic + body_raw[2]
-		}
+			topic += body_raw[2]
 
+		default:
+
+			return errors.New("Bad formatting on the topic")
+
+		}
 		if !sc.checkSubscribed(xmppPair{stanza.From, topic}) {
 
 			//storing message on the slice
@@ -242,63 +240,56 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 
 	topic := (*message).Topic()
+
+	if len(topic) == 0 {
+		return errors.New("Not publishing on empty topic!")
+	}
+
 	err := errors.New("")
-	var text string
+	text := "\n"
+	topic_raw := strings.Split(topic, "/")
 
-	switch topic {
+	if strings.Compare(topic_raw[0], "smartgrid") != 0 {
 
-	case "/smartgrid/listOfDevices":
+		return errors.New("Bad topic on mqtt publish")
+	}
 
-		//`["1","2","3"]`
+	// Given a possibly complex JSON object
+	msg := string((*message).Payload())
 
-		dataJson := (*message).Payload()
+	//we could list devices based on the "type" field
+	if strings.Compare(topic_raw[1], "listOfDevices") == 0 {
 
 		var devices []string
-
-		err = json.Unmarshal([]byte(dataJson), &devices)
+		err = json.Unmarshal([]byte(msg), &devices)
 
 		text += "Devices: \n"
 
-		for i, value := range devices {
-			text = text + strconv.Itoa(i) + ".- " + value + "\n"
+		for _, value := range devices {
+			text += "\t" + value + "\n"
 		}
 
-	case "/smartgrid/device1/variable1":
+		fmt.Printf("%s", text)
 
-		//`{"variable": "variable1", "value": "value1"}`
+	} else {
 
-		var m Mensajee
-		err = json.Unmarshal((*message).Payload(), &m)
+		// We only know our top-level keys are strings
+		mp := make(map[string]interface{})
 
+		// Decode JSON into our map
+		err := json.Unmarshal([]byte(msg), &mp)
 		if err != nil {
-			log.Fatal(err)
+			println(err)
+			return err
 		}
 
-		body_raw := strings.Split(topic, "/")
+		// See what the map has now
+		fmt.Printf("mp is now: %+v\n", mp)
 
-		fmt.Printf("Getting %s from %s:\n", body_raw[2], body_raw[1])
-
-		fmt.Printf("%s: %s\n", m.Variable, m.Value)
-
-	case "/smartgrid/device1":
-
-		//`[{"variable": "variable1", "value": "value1"}, {"variable": "variable2", "value": "value2"}]`
-
-		var m []Mensajee
-
-		err = json.Unmarshal((*message).Payload(), &m)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		body_raw := strings.Split(topic, "/")
-
-		fmt.Printf("Getting %s from %s:\n", body_raw[2], body_raw[1])
-
-		for _, value := range m {
-
-			fmt.Printf("%s: %s\n", value.Variable, value.Value)
+		// Iterate the map and print out the elements one by one
+		// Note: that mp has to be deferenced here or range will fail
+		for key, value := range mp {
+			text += "\t" + string(key) + " : " + fmt.Sprintf("%v", value) + "\n"
 		}
 	}
 
@@ -335,6 +326,7 @@ func (sc *StaticConfig) checkSubscribed(pair xmppPair) bool {
 	return false
 }
 
+//answer back all xmpp petitions subscribed to topic
 func (sc *StaticConfig) getAddresses(topic string) []*xco.Address {
 
 	addresses := []*xco.Address{}
@@ -348,6 +340,7 @@ func (sc *StaticConfig) getAddresses(topic string) []*xco.Address {
 	return addresses
 }
 
+//Get messages stacked with the given topic
 func (sc *StaticConfig) getMessage(topic string) string {
 
 	for _, value := range sc.mqttMessageStack {
