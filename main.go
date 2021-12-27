@@ -204,13 +204,7 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 
 			//storing message on the array
 			sc.xmppMessageStack = append(sc.xmppMessageStack, xmppPair{stanza.From, topic})
-
 			err := sc.mqttClient.mqttSub(topic)
-
-			// for _, value := range sc.mqttMessageStack {
-			// 	fmt.Printf("Mensajes en la pila: Topic: %s, Message: %s\n", value.topic, value.content)
-			// }
-
 			messagePublished := sc.getMessage(topic)
 
 			fmt.Print(messagePublished)
@@ -250,6 +244,8 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 	text := "\n"
 	topic_raw := strings.Split(topic, "/")
 
+	sc.checkDuplicates(mqttPair{topic, string((*message).Payload())})
+
 	if strings.Compare(topic_raw[0], "smartgrid") != 0 {
 
 		return errors.New("Bad topic on mqtt publish")
@@ -269,8 +265,6 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 		for _, value := range devices {
 			text += "\t" + value + "\n"
 		}
-
-		//fmt.Printf("%s", text)
 
 	} else {
 
@@ -299,7 +293,7 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 
 		} else {
 
-			// Iterate the map and print out the elements one by one
+			// Iterate the map
 			// Note: that mp has to be deferenced here or range will fail
 			text += topic_raw[1] + ":\n"
 			for key, value := range mp {
@@ -307,7 +301,6 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 			}
 		}
 	}
-
 	//appending the message to the mqttStack
 	sc.mqttMessageStack = append(sc.mqttMessageStack, mqttPair{(*message).Topic(), text})
 
@@ -339,6 +332,19 @@ func (sc *StaticConfig) checkSubscribed(pair xmppPair) bool {
 		}
 	}
 	return false
+}
+
+func (sc *StaticConfig) checkDuplicates(pair mqttPair) {
+
+	for i, value := range sc.mqttMessageStack {
+
+		//removing duplicates from the stack
+		if value.topic == pair.topic {
+			sc.mqttMessageStack[i] = sc.mqttMessageStack[len(sc.mqttMessageStack)-1]
+			sc.mqttMessageStack = sc.mqttMessageStack[:len(sc.mqttMessageStack)-1]
+			break
+		}
+	}
 }
 
 //answer back all xmpp petitions subscribed to topic
