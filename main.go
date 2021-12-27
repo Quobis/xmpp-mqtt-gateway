@@ -120,7 +120,7 @@ func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 			case rxMqtt := <-rxMqttCh:
 				log.Println("MQTT message received with ID: ", (*rxMqtt).MessageID()) //ANTON
 				log.Println("MQTT message received with topic: ", (*rxMqtt).Topic())
-				log.Println("MQTT message received with payload: ", string((*rxMqtt).Payload()))
+				log.Println("MQTT message received with payload: \n", string((*rxMqtt).Payload()))
 
 				err := sc.mqttToStanza(rxMqtt)
 
@@ -179,11 +179,6 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 
 		switch body_raw[1] { //the second word makes the difference
 
-		//GET variable1 from device1
-		case "variable":
-
-			topic += body_raw[3] + "/" + body_raw[1]
-
 		//GET devices
 		case "devices":
 
@@ -196,12 +191,18 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 
 		default:
 
+			//GET variable1 from device1
+			if strings.Compare(body_raw[2], "from") == 0 {
+				topic += body_raw[3] + "/" + body_raw[1]
+				break
+			}
+
 			return errors.New("Bad formatting on the topic")
 
 		}
 		if !sc.checkSubscribed(xmppPair{stanza.From, topic}) {
 
-			//storing message on the slice
+			//storing message on the array
 			sc.xmppMessageStack = append(sc.xmppMessageStack, xmppPair{stanza.From, topic})
 
 			err := sc.mqttClient.mqttSub(topic)
@@ -269,7 +270,7 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 			text += "\t" + value + "\n"
 		}
 
-		fmt.Printf("%s", text)
+		//fmt.Printf("%s", text)
 
 	} else {
 
@@ -283,13 +284,27 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 			return err
 		}
 
-		// See what the map has now
-		fmt.Printf("mp is now: %+v\n", mp)
+		//If the topic has the format (smartgrid/device_id/variable)
+		if len(topic_raw) == 3 {
 
-		// Iterate the map and print out the elements one by one
-		// Note: that mp has to be deferenced here or range will fail
-		for key, value := range mp {
-			text += "\t" + string(key) + " : " + fmt.Sprintf("%v", value) + "\n"
+			//Battery || Thermostat || Solar_kit: device_id
+			//Type field needs to be included and not nil
+			if mp["type"] != nil {
+				text += fmt.Sprintf("%v", mp["type"]) + ": " + topic_raw[1] + "\n"
+			} else {
+				text += "Device" + ": " + topic_raw[1] + "\n"
+			}
+
+			text += "\t" + topic_raw[2] + ": " + fmt.Sprintf("%v", mp[topic_raw[2]])
+
+		} else {
+
+			// Iterate the map and print out the elements one by one
+			// Note: that mp has to be deferenced here or range will fail
+			text += topic_raw[1] + ":\n"
+			for key, value := range mp {
+				text += "\t" + string(key) + " : " + fmt.Sprintf("%v", value) + "\n"
+			}
 		}
 	}
 
@@ -305,7 +320,7 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 	for _, value := range sc.getAddresses(topic) {
 
 		stanza := sc.xmppComponent.createStanza(xgwAdr, value, text)
-		fmt.Printf("Stanza to be send: Body: %s; From: %s\n", text, value.DomainPart)
+		fmt.Printf("Stanza to be send: \nBody: %s\n; From: %s\n", text, value.DomainPart)
 
 		err = sc.xmppComponent.xmppComponent.Send(stanza)
 
