@@ -9,7 +9,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"reflect"
+
+	//"reflect"
 	"time"
 
 	"strings"
@@ -32,19 +33,19 @@ type StaticConfig struct {
 	rxMqttCh chan *mqtt.Message
 	rxXmppCh chan *xco.Message
 
-	xmppMessageStack []xmppPair
-	mqttMessageStack []mqttPair
+	xmppMessageStack map[xco.Address][]string
+	mqttMessageStack map[string]string
 }
 
-type xmppPair struct {
-	from  *xco.Address
-	topic string
-}
+// type xmppPair struct {
+// 	from  *xco.Address
+// 	topic string
+// }
 
-type mqttPair struct {
-	topic   string
-	content string
-}
+// type mqttPair struct {
+// 	topic   string
+// 	content string
+// }
 
 func main() {
 
@@ -66,13 +67,8 @@ func main() {
 	sc.rxXmppCh = make(chan *xco.Message)
 	sc.rxMqttCh = make(chan *mqtt.Message)
 
-	//Testing the subscribe to a topic before publish (not persistent message stack)
-
-	// s := mqttPair{
-	// 	"smartgrid/listOfDevices",
-	// 	"deviceExample",
-	// }
-	// sc.mqttMessageStack = append(sc.mqttMessageStack, s)
+	sc.xmppMessageStack = make(map[xco.Address][]string)
+	sc.mqttMessageStack = make(map[string]string)
 
 	// start goroutines
 	gatewayDead := sc.runGatewayProcess()
@@ -127,6 +123,8 @@ func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 				if err != nil {
 					log.Printf("Error receiving mqtt msg: %s", err)
 				}
+
+				fmt.Printf("%v", sc.mqttMessageStack)
 
 			}
 			log.Println("gateway looping \n")
@@ -200,12 +198,12 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 			return errors.New("Bad formatting on the topic")
 
 		}
-		if !sc.checkSubscribed(xmppPair{stanza.From, topic}) {
 
+		if !sc.checkSubscribed(*stanza.From, topic) {
 			//storing message on the array
-			sc.xmppMessageStack = append(sc.xmppMessageStack, xmppPair{stanza.From, topic})
+			sc.xmppMessageStack[*stanza.From] = append(sc.xmppMessageStack[*stanza.From], topic)
 			err := sc.mqttClient.mqttSub(topic)
-			messagePublished := sc.getMessage(topic)
+			messagePublished := sc.mqttMessageStack[topic]
 
 			fmt.Print(messagePublished)
 
@@ -220,10 +218,9 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 
 			return err
 		}
-
 		//if subscribed, xmpp client get response from the already subscribed topic
 
-		returnStanza := sc.xmppComponent.createStanza(xgwAdr, stanza.From, sc.getMessage(topic))
+		returnStanza := sc.xmppComponent.createStanza(xgwAdr, stanza.From, sc.mqttMessageStack[topic])
 		return sc.xmppComponent.xmppComponent.Send(returnStanza)
 
 	}
@@ -243,8 +240,6 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 	err := errors.New("")
 	text := "\n"
 	topic_raw := strings.Split(topic, "/")
-
-	sc.checkDuplicates(mqttPair{topic, string((*message).Payload())})
 
 	if strings.Compare(topic_raw[0], "smartgrid") != 0 {
 
@@ -301,8 +296,8 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 			}
 		}
 	}
-	//appending the message to the mqttStack
-	sc.mqttMessageStack = append(sc.mqttMessageStack, mqttPair{(*message).Topic(), text})
+	//setting the message to the mqttStack
+	sc.mqttMessageStack[topic] = text
 
 	xgwAdr := &xco.Address{
 		//LocalPart:  sc.config.Xmpp.Host,
@@ -312,7 +307,7 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 	//getting all the addresses subscribed to a topic and creating stanzas to answer back
 	for _, value := range sc.getAddresses(topic) {
 
-		stanza := sc.xmppComponent.createStanza(xgwAdr, value, text)
+		stanza := sc.xmppComponent.createStanza(xgwAdr, &value, text)
 		fmt.Printf("Stanza to be send: \nBody: %s\n; From: %s\n", text, value.DomainPart)
 
 		err = sc.xmppComponent.xmppComponent.Send(stanza)
@@ -324,53 +319,35 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 }
 
 //checks if xmpp client is subscribed to topic based on xmppmessage "stack"
-func (sc *StaticConfig) checkSubscribed(pair xmppPair) bool {
+func (sc *StaticConfig) checkSubscribed(xAddr xco.Address, topic string) bool {
 
-	for _, value := range sc.xmppMessageStack {
-		if value.topic == pair.topic && reflect.DeepEqual(value.from, pair.from) {
+	if len(sc.xmppMessageStack[xAddr]) == 0 {
+		return false
+	}
+
+	for _, value := range sc.xmppMessageStack[xAddr] {
+		if strings.Compare(topic, value) == 0 {
 			return true
 		}
 	}
 	return false
 }
 
-func (sc *StaticConfig) checkDuplicates(pair mqttPair) {
-
-	for i, value := range sc.mqttMessageStack {
-
-		//removing duplicates from the stack
-		if value.topic == pair.topic {
-			sc.mqttMessageStack[i] = sc.mqttMessageStack[len(sc.mqttMessageStack)-1]
-			sc.mqttMessageStack = sc.mqttMessageStack[:len(sc.mqttMessageStack)-1]
-			break
-		}
-	}
-}
-
 //answer back all xmpp petitions subscribed to topic
-func (sc *StaticConfig) getAddresses(topic string) []*xco.Address {
+func (sc *StaticConfig) getAddresses(topic string) []xco.Address {
 
-	addresses := []*xco.Address{}
+	addresses := []xco.Address{}
 
-	for _, value := range sc.xmppMessageStack {
+	for i, value := range sc.xmppMessageStack {
 
-		if value.topic == topic {
-			addresses = append(addresses, value.from)
+		for _, v := range value {
+			if v == topic {
+				addresses = append(addresses, i)
+			}
 		}
+
 	}
 	return addresses
-}
-
-//Get messages stacked with the given topic
-func (sc *StaticConfig) getMessage(topic string) string {
-
-	for _, value := range sc.mqttMessageStack {
-
-		if value.topic == topic {
-			return value.content
-		}
-	}
-	return ""
 }
 
 // func (sc *StaticConfig) setSippoServer() (*SippoClient, error) {
