@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"reflect"
-	"strconv"
+
+	//"reflect"
 	"time"
 
 	"strings"
@@ -33,24 +33,19 @@ type StaticConfig struct {
 	rxMqttCh chan *mqtt.Message
 	rxXmppCh chan *xco.Message
 
-	xmppMessageStack []xmppPair
-	mqttMessageStack []mqttPair
+	xmppMessageStack map[xco.Address][]string
+	mqttMessageStack map[string]string
 }
 
-type xmppPair struct {
-	from  *xco.Address
-	topic string
-}
+// type xmppPair struct {
+// 	from  *xco.Address
+// 	topic string
+// }
 
-type mqttPair struct {
-	topic   string
-	content string
-}
-
-type Mensajee struct {
-	Variable string `json:variable`
-	Value    string `json:value`
-}
+// type mqttPair struct {
+// 	topic   string
+// 	content string
+// }
 
 func main() {
 
@@ -72,13 +67,8 @@ func main() {
 	sc.rxXmppCh = make(chan *xco.Message)
 	sc.rxMqttCh = make(chan *mqtt.Message)
 
-	//Testing the subscribe to a topic before publish (not persistent message stack)
-
-	// s := mqttPair{
-	// 	"/smartgrid/listOfDevices",
-	// 	"deviceListExample",
-	// }
-	// sc.mqttMessageStack = append(sc.mqttMessageStack, s)
+	sc.xmppMessageStack = make(map[xco.Address][]string)
+	sc.mqttMessageStack = make(map[string]string)
 
 	// start goroutines
 	gatewayDead := sc.runGatewayProcess()
@@ -126,13 +116,15 @@ func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 			case rxMqtt := <-rxMqttCh:
 				log.Println("MQTT message received with ID: ", (*rxMqtt).MessageID()) //ANTON
 				log.Println("MQTT message received with topic: ", (*rxMqtt).Topic())
-				log.Println("MQTT message received with payload: ", string((*rxMqtt).Payload()))
+				log.Println("MQTT message received with payload: \n", string((*rxMqtt).Payload()))
 
 				err := sc.mqttToStanza(rxMqtt)
 
 				if err != nil {
 					log.Printf("Error receiving mqtt msg: %s", err)
 				}
+
+				fmt.Printf("%v", sc.mqttMessageStack)
 
 			}
 			log.Println("gateway looping \n")
@@ -168,7 +160,7 @@ func (sc *StaticConfig) runMqttProcess() <-chan struct{} {
 // ANTON the code inside this func should be in a goroutine
 func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 
-	topic := "/smartgrid/"
+	topic := "smartgrid/"
 
 	xgwAdr := &xco.Address{
 		DomainPart: sc.config.Xmpp.Name,
@@ -185,34 +177,33 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 
 		switch body_raw[1] { //the second word makes the difference
 
-		//GET variable1 from device1
-		case "variable":
-
-			topic = topic + body_raw[3] + "/" + body_raw[1]
-
 		//GET devices
 		case "devices":
 
-			topic = topic + "listOfDevices"
+			topic += "listOfDevices"
 
-		//GET values device1
+		//GET values device
 		case "values":
 
-			topic = topic + body_raw[2]
+			topic += body_raw[2]
+
+		default:
+
+			//GET variable1 from device1
+			if strings.Compare(body_raw[2], "from") == 0 {
+				topic += body_raw[3] + "/" + body_raw[1]
+				break
+			}
+
+			return errors.New("Bad formatting on the topic")
+
 		}
 
-		if !sc.checkSubscribed(xmppPair{stanza.From, topic}) {
-
-			//storing message on the slice
-			sc.xmppMessageStack = append(sc.xmppMessageStack, xmppPair{stanza.From, topic})
-
+		if !sc.checkSubscribed(*stanza.From, topic) {
+			//storing message on the array
+			sc.xmppMessageStack[*stanza.From] = append(sc.xmppMessageStack[*stanza.From], topic)
 			err := sc.mqttClient.mqttSub(topic)
-
-			// for _, value := range sc.mqttMessageStack {
-			// 	fmt.Printf("Mensajes en la pila: Topic: %s, Message: %s\n", value.topic, value.content)
-			// }
-
-			messagePublished := sc.getMessage(topic)
+			messagePublished := sc.mqttMessageStack[topic]
 
 			fmt.Print(messagePublished)
 
@@ -227,10 +218,9 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 
 			return err
 		}
-
 		//if subscribed, xmpp client get response from the already subscribed topic
 
-		returnStanza := sc.xmppComponent.createStanza(xgwAdr, stanza.From, sc.getMessage(topic))
+		returnStanza := sc.xmppComponent.createStanza(xgwAdr, stanza.From, sc.mqttMessageStack[topic])
 		return sc.xmppComponent.xmppComponent.Send(returnStanza)
 
 	}
@@ -242,68 +232,72 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 
 	topic := (*message).Topic()
+
+	if len(topic) == 0 {
+		return errors.New("Not publishing on empty topic!")
+	}
+
 	err := errors.New("")
-	var text string
+	text := "\n"
+	topic_raw := strings.Split(topic, "/")
 
-	switch topic {
+	if strings.Compare(topic_raw[0], "smartgrid") != 0 {
 
-	case "/smartgrid/listOfDevices":
+		return errors.New("Bad topic on mqtt publish")
+	}
 
-		//`["1","2","3"]`
+	// Given a possibly complex JSON object
+	msg := string((*message).Payload())
 
-		dataJson := (*message).Payload()
+	//we could list devices based on the "type" field
+	if strings.Compare(topic_raw[1], "listOfDevices") == 0 {
 
 		var devices []string
-
-		err = json.Unmarshal([]byte(dataJson), &devices)
+		err = json.Unmarshal([]byte(msg), &devices)
 
 		text += "Devices: \n"
 
-		for i, value := range devices {
-			text = text + strconv.Itoa(i) + ".- " + value + "\n"
+		for _, value := range devices {
+			text += "\t" + value + "\n"
 		}
 
-	case "/smartgrid/device1/variable1":
+	} else {
 
-		//`{"variable": "variable1", "value": "value1"}`
+		// We only know our top-level keys are strings
+		mp := make(map[string]interface{})
 
-		var m Mensajee
-		err = json.Unmarshal((*message).Payload(), &m)
-
+		// Decode JSON into our map
+		err := json.Unmarshal([]byte(msg), &mp)
 		if err != nil {
-			log.Fatal(err)
+			println(err)
+			return err
 		}
 
-		body_raw := strings.Split(topic, "/")
+		//If the topic has the format (smartgrid/device_id/variable)
+		if len(topic_raw) == 3 {
 
-		fmt.Printf("Getting %s from %s:\n", body_raw[2], body_raw[1])
+			//Battery || Thermostat || Solar_kit: device_id
+			//Type field needs to be included and not nil
+			if mp["type"] != nil {
+				text += fmt.Sprintf("%v", mp["type"]) + ": " + topic_raw[1] + "\n"
+			} else {
+				text += "Device" + ": " + topic_raw[1] + "\n"
+			}
 
-		fmt.Printf("%s: %s\n", m.Variable, m.Value)
+			text += "\t" + topic_raw[2] + ": " + fmt.Sprintf("%v", mp[topic_raw[2]])
 
-	case "/smartgrid/device1":
+		} else {
 
-		//`[{"variable": "variable1", "value": "value1"}, {"variable": "variable2", "value": "value2"}]`
-
-		var m []Mensajee
-
-		err = json.Unmarshal((*message).Payload(), &m)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		body_raw := strings.Split(topic, "/")
-
-		fmt.Printf("Getting %s from %s:\n", body_raw[2], body_raw[1])
-
-		for _, value := range m {
-
-			fmt.Printf("%s: %s\n", value.Variable, value.Value)
+			// Iterate the map
+			// Note: that mp has to be deferenced here or range will fail
+			text += topic_raw[1] + ":\n"
+			for key, value := range mp {
+				text += "\t" + string(key) + " : " + fmt.Sprintf("%v", value) + "\n"
+			}
 		}
 	}
-
-	//appending the message to the mqttStack
-	sc.mqttMessageStack = append(sc.mqttMessageStack, mqttPair{(*message).Topic(), text})
+	//setting the message to the mqttStack
+	sc.mqttMessageStack[topic] = text
 
 	xgwAdr := &xco.Address{
 		//LocalPart:  sc.config.Xmpp.Host,
@@ -313,8 +307,8 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 	//getting all the addresses subscribed to a topic and creating stanzas to answer back
 	for _, value := range sc.getAddresses(topic) {
 
-		stanza := sc.xmppComponent.createStanza(xgwAdr, value, text)
-		fmt.Printf("Stanza to be send: Body: %s; From: %s\n", text, value.DomainPart)
+		stanza := sc.xmppComponent.createStanza(xgwAdr, &value, text)
+		fmt.Printf("Stanza to be send: \nBody: %s\n; From: %s\n", text, value.DomainPart)
 
 		err = sc.xmppComponent.xmppComponent.Send(stanza)
 
@@ -325,38 +319,35 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 }
 
 //checks if xmpp client is subscribed to topic based on xmppmessage "stack"
-func (sc *StaticConfig) checkSubscribed(pair xmppPair) bool {
+func (sc *StaticConfig) checkSubscribed(xAddr xco.Address, topic string) bool {
 
-	for _, value := range sc.xmppMessageStack {
-		if value.topic == pair.topic && reflect.DeepEqual(value.from, pair.from) {
+	if len(sc.xmppMessageStack[xAddr]) == 0 {
+		return false
+	}
+
+	for _, value := range sc.xmppMessageStack[xAddr] {
+		if strings.Compare(topic, value) == 0 {
 			return true
 		}
 	}
 	return false
 }
 
-func (sc *StaticConfig) getAddresses(topic string) []*xco.Address {
+//answer back all xmpp petitions subscribed to topic
+func (sc *StaticConfig) getAddresses(topic string) []xco.Address {
 
-	addresses := []*xco.Address{}
+	addresses := []xco.Address{}
 
-	for _, value := range sc.xmppMessageStack {
+	for i, value := range sc.xmppMessageStack {
 
-		if value.topic == topic {
-			addresses = append(addresses, value.from)
+		for _, v := range value {
+			if v == topic {
+				addresses = append(addresses, i)
+			}
 		}
+
 	}
 	return addresses
-}
-
-func (sc *StaticConfig) getMessage(topic string) string {
-
-	for _, value := range sc.mqttMessageStack {
-
-		if value.topic == topic {
-			return value.content
-		}
-	}
-	return ""
 }
 
 // func (sc *StaticConfig) setSippoServer() (*SippoClient, error) {
