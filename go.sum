@@ -13,8 +13,6 @@ github.com/chromedp/chromedp v0.3.1-0.20190619195644-fd957a4d2901/go.mod h1:mJdv
 github.com/chromedp/chromedp v0.4.0/go.mod h1:DC3QUn4mJ24dwjcaGQLoZrhm4X/uPHZ6spDbS2uFhm4=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dgrijalva/jwt-go v3.2.0+incompatible h1:7qlOGliEKZXTDg6OTjfoBKDXWrumCAMpl/TFQ4/5kLM=
-github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/eclipse/paho.mqtt.golang v1.3.4 h1:/sS2PA+PgomTO1bfJSDJncox+U7X5Boa3AfhEywYdgI=
 github.com/eclipse/paho.mqtt.golang v1.3.4/go.mod h1:eTzb4gxwwyWpqBUHGQZ4ABAV7+Jgm1PklsYT/eo8Hcc=
 github.com/eclipse/paho.mqtt.golang v1.3.5 h1:sWtmgNxYM9P2sP+xEItMozsR3w0cqZFlqnNN1bdl41Y=
