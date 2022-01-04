@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
@@ -44,23 +45,26 @@ func (c *mqttClient) mqttSub(topic string) error {
 	// }()
 
 	//token.Wait()
-	fmt.Printf("Client %s, subscribed to topic %s\n", c.Username, topic)
+	if token.Error() == nil {
+
+		fmt.Printf("Client %s, subscribed to topic %s\n", c.Username, topic)
+	}
 
 	return token.Error()
 }
 
-func (c *mqttClient) mqttPublish(message, topic string) error {
+// func (c *mqttClient) mqttPublish(message, topic string) error {
 
-	fmt.Sprintf("\nPublishing to topic: %s", topic)
+// 	fmt.Printf("\nPublishing to topic: %s", topic)
 
-	token := c.Client.Publish(topic, 0, false, message)
-	//waits indefinetly until the message is sent to the broker and ack back to the client
+// 	token := c.Client.Publish(topic, 0, false, message)
+// 	//waits indefinetly until the message is sent to the broker and ack back to the client
 
-	token.Wait()
-	fmt.Sprintf("Published %s,\nwith topic: %s", message, topic)
+// 	token.Wait()
+// 	fmt.Printf("Published %s,\nwith topic: %s", message, topic)
 
-	return token.Error()
-}
+// 	return token.Error()
+// }
 
 func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 	opts := mqtt.NewClientOptions()
@@ -88,9 +92,7 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 
 	c.connectHandler = func(client mqtt.Client) {
 		fmt.Println("Connected to MQTT broker")
-		// go func() {
-		// 	c.gatewayRx <- &msg
-		// }()
+		sc.mqttReadyCh <- true
 	}
 
 	opts.OnConnect = c.connectHandler
@@ -129,12 +131,9 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 			panic(token.Error())
 		}
 
-		// c.Client.Subscribe("/smartgrid/listOfDevices", 1, nil)
-		// c.Client.Subscribe("/smartgrid/device1/variable1", 1, nil)
-		// c.Client.Subscribe("/smartgrid/device1", 1, nil)
-
 		//with this we keep the client connected until a SIGTERM
 		//signal is received
+
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 		<-sigs
@@ -142,6 +141,12 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 
 	}()
 	return healthCh
+}
+
+func NewMessageID() uint16 {
+	rand.Seed(time.Now().UnixNano())
+	return uint16(rand.Intn(65536))
+
 }
 
 // func (c *mqttClient) onReceivedMessage(x *xco.Component, m *xco.Message) error {

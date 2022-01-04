@@ -30,6 +30,9 @@ type StaticConfig struct {
 	xmppComponent Component
 	mqttClient    mqttClient
 
+	mqttReadyCh chan bool
+	xmppReadyCh chan bool
+
 	rxMqttCh chan *mqtt.Message
 	rxXmppCh chan *xco.Message
 
@@ -108,7 +111,7 @@ func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 			select {
 			case rxXmpp := <-rxXmppCh:
 				log.Println("Xmpp stanza received: ", rxXmpp.Body)
-				err := sc.processStanza(rxXmpp)
+				_, err := sc.processStanza(rxXmpp)
 				if err != nil {
 					log.Printf("Error receiving xmpp msg: %s", err)
 				}
@@ -127,7 +130,7 @@ func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 				fmt.Printf("%v", sc.mqttMessageStack)
 
 			}
-			log.Println("gateway looping \n")
+			log.Println("***************gateway looping******************")
 		}
 	}(sc.rxXmppCh, sc.rxMqttCh)
 
@@ -158,7 +161,7 @@ func (sc *StaticConfig) runMqttProcess() <-chan struct{} {
 }
 
 // ANTON the code inside this func should be in a goroutine
-func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
+func (sc *StaticConfig) processStanza(stanza *xco.Message) (*xco.Message, error) {
 
 	topic := "smartgrid/"
 
@@ -167,8 +170,7 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 	}
 
 	if len(stanza.Body) == 0 {
-		fmt.Printf("Not processing empty stanza! ")
-		return nil
+		return nil, errors.New("Not processing empty stanza! ")
 	}
 	body_raw := strings.Split(stanza.Body, " ")
 
@@ -195,7 +197,7 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 				break
 			}
 
-			return errors.New("Bad formatting on the topic")
+			return nil, errors.New("Bad formatting on the topic")
 
 		}
 
@@ -205,28 +207,30 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) error {
 			err := sc.mqttClient.mqttSub(topic)
 			messagePublished := sc.mqttMessageStack[topic]
 
-			fmt.Print(messagePublished)
+			fmt.Println(messagePublished)
 
 			if messagePublished != "" {
 
 				fmt.Printf("Sending message: %s, from %s, to %s:%s \n", messagePublished, xgwAdr.DomainPart, stanza.From.LocalPart, stanza.From.DomainPart)
 
 				returnStanza := sc.xmppComponent.createStanza(xgwAdr, stanza.From, messagePublished)
-				return sc.xmppComponent.xmppComponent.Send(returnStanza)
+				return returnStanza, sc.xmppComponent.xmppComponent.Send(returnStanza)
 
 			}
 
-			return err
+			fmt.Println("No message attached to that topic yet.")
+
+			return nil, err
 		}
 		//if subscribed, xmpp client get response from the already subscribed topic
 
 		returnStanza := sc.xmppComponent.createStanza(xgwAdr, stanza.From, sc.mqttMessageStack[topic])
-		return sc.xmppComponent.xmppComponent.Send(returnStanza)
+		return returnStanza, sc.xmppComponent.xmppComponent.Send(returnStanza)
 
 	}
 
 	//not standard message, ignoring it
-	return errors.New("Wrong xmpp body format.")
+	return nil, errors.New("Wrong xmpp body format.")
 }
 
 func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
