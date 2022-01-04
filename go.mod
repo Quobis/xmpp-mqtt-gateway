@@ -4,7 +4,6 @@ go 1.16
 
 require (
 	github.com/BurntSushi/toml v0.3.1
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/eclipse/paho.mqtt.golang v1.3.5
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
