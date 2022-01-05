@@ -121,7 +121,7 @@ func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 				log.Println("MQTT message received with topic: ", (*rxMqtt).Topic())
 				log.Println("MQTT message received with payload: \n", string((*rxMqtt).Payload()))
 
-				err := sc.mqttToStanza(rxMqtt)
+				_, err := sc.mqttToStanza(rxMqtt)
 
 				if err != nil {
 					log.Printf("Error receiving mqtt msg: %s", err)
@@ -233,12 +233,13 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) (*xco.Message, error)
 	return nil, errors.New("Wrong xmpp body format.")
 }
 
-func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
+func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) (*xco.Message, error) {
 
 	topic := (*message).Topic()
+	var stanza *xco.Message
 
 	if len(topic) == 0 {
-		return errors.New("Not publishing on empty topic!")
+		return nil, errors.New("Not publishing on empty topic!")
 	}
 
 	err := errors.New("")
@@ -247,7 +248,7 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 
 	if strings.Compare(topic_raw[0], "smartgrid") != 0 {
 
-		return errors.New("Bad topic on mqtt publish")
+		return nil, errors.New("Bad topic on mqtt publish")
 	}
 
 	// Given a possibly complex JSON object
@@ -274,7 +275,7 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 		err := json.Unmarshal([]byte(msg), &mp)
 		if err != nil {
 			println(err)
-			return err
+			return nil, err
 		}
 
 		//If the topic has the format (smartgrid/device_id/variable)
@@ -311,14 +312,14 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) error {
 	//getting all the addresses subscribed to a topic and creating stanzas to answer back
 	for _, value := range sc.getAddresses(topic) {
 
-		stanza := sc.xmppComponent.createStanza(xgwAdr, &value, text)
-		fmt.Printf("Stanza to be send: \nBody: %s\n; From: %s\n", text, value.DomainPart)
+		stanza = sc.xmppComponent.createStanza(xgwAdr, &value, text)
+		//fmt.Printf("Stanza to be send: \nBody: %s\n; From: %s\n", text, value.DomainPart)
 
 		err = sc.xmppComponent.xmppComponent.Send(stanza)
 
 	}
 
-	return err
+	return stanza, err
 
 }
 

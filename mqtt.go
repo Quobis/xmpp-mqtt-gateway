@@ -12,11 +12,6 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
-// type mqttReceived struct {
-// 	client mqtt.Client
-// 	msg    mqtt.Message
-// }
-
 type mqttClient struct {
 	Url                string
 	Password           string

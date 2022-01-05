@@ -56,8 +56,6 @@ func (c *Component) runXmppComponent(sc *StaticConfig) <-chan struct{} {
 		c.xmppComponent = x
 		sc.xmppComponent = *c
 
-		fmt.Println("ready")
-
 		//xmpp component running on go-routine
 		go func() {
 			err = x.Run()
@@ -65,9 +63,10 @@ func (c *Component) runXmppComponent(sc *StaticConfig) <-chan struct{} {
 		sc.xmppReadyCh <- true
 		if err == nil {
 			fmt.Println("Client xmpp connected.")
+		} else {
+			log.Printf("lost XMPP connection:%s", err)
 		}
 
-		log.Printf("lost XMPP connection:%s", err)
 	}()
 	return healthCh
 }
