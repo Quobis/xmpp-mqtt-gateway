@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -31,6 +32,28 @@ func TestMqttToStanza(t *testing.T) {
 	mockConfig.rxMqttCh = make(chan *mqtt.Message)
 	mockConfig.rxXmppCh = make(chan *xco.Message)
 
+	smartgrid := struct {
+		listOfDevices string
+		devices       []map[string]interface{}
+	}{
+		listOfDevices: "[\"bat_01\", \"th_01\"]",
+		devices: []map[string]interface{}{
+			{
+				"battery_id": "bat_01",
+				"power":      100,
+				"capacity":   1000,
+				"type":       "Battery",
+			},
+			{
+				"thermostat_id": "th_01",
+				"currentTemp":   20,
+				"mode":          "mode_1",
+				"battery":       80,
+				"type":          "Thermostat",
+			},
+		},
+	}
+
 	tests := []struct {
 		name string
 		chat string
@@ -41,10 +64,10 @@ func TestMqttToStanza(t *testing.T) {
 			name: "Case devices",
 			args: args{
 				topic:   "smartgrid/listOfDevices",
-				message: "[\"device_1\", \"device_2\"]",
+				message: fmt.Sprintf("[\"%v\", \"%v\"]", smartgrid.listOfDevices[0], smartgrid.listOfDevices[1]),
 			},
 
-			want: "\nDevices: \n\tdevice_1\n\tdevice_2\n",
+			want: fmt.Sprintf("\nDevices: \n\t%v\n\t%v\n", smartgrid.listOfDevices[0], smartgrid.listOfDevices[1]),
 		},
 		{
 			name: "Case values",
@@ -58,7 +81,8 @@ func TestMqttToStanza(t *testing.T) {
 		{
 			name: "Case variable",
 			args: args{
-				topic:   "smartgrid/bat_01/power",
+				topic: "smartgrid/bat_01/power",
+				//if type not included, the output changes
 				message: "{\"power\": 1111, \"type\":\"Battery\"}",
 			},
 			want: "\nBattery: bat_01\n\tpower: 1111",
@@ -86,8 +110,9 @@ func TestMqttToStanza(t *testing.T) {
 		Body: "",
 	}
 
-	err := mockConfig.serversUp(t)
+	mock, err := mockConfig.serversUp(t)
 	ok(t, err)
+	//defer mock.Stop()
 
 	fmt.Println()
 	//client subscribing directly to the "table" topics
@@ -104,7 +129,7 @@ func TestMqttToStanza(t *testing.T) {
 	})
 
 	//client publishing directly on the "table" topics
-	for _, tt := range tests {
+	for i, tt := range tests {
 		fmt.Println()
 		t.Run(tt.name, func(t *testing.T) {
 
@@ -120,9 +145,18 @@ func TestMqttToStanza(t *testing.T) {
 				testStanza, err := mockConfig.mqttToStanza(message)
 				ok(t, err)
 
-				if strings.Compare(testStanza.Body, tt.want) != 0 {
+				if i != 1 {
+					if strings.Compare(testStanza.Body, tt.want) != 0 {
 
-					t.Errorf("Message obtained = %v, message wanted %v", testStanza.Body, tt.want)
+						t.Errorf("Message obtained = %v, message wanted %v", testStanza.Body, tt.want)
+					}
+				} else {
+
+					equals(t, mockStanza.XMLName, testStanza.XMLName)
+					equals(t, mockStanza.Header.From, testStanza.Header.To)
+					equals(t, mockStanza.Header.To, testStanza.Header.From)
+					equals(t, mockStanza.Type, testStanza.Type)
+					//equals(t, mockStanza.Body, tt.want)
 				}
 
 			case <-time.After(3 * time.Second):
@@ -134,6 +168,8 @@ func TestMqttToStanza(t *testing.T) {
 	}
 
 	fmt.Println()
+
+	defer mock.Stop()
 
 }
 
@@ -163,7 +199,8 @@ func TestProcessStanza(t *testing.T) {
 		{
 			name: "Case variable",
 			args: args{
-				topic:   "GET power from bat_01",
+				topic: "GET power from bat_01",
+				//if type not included, the output changes
 				message: "{\"power\": 1111, \"type\":\"Battery\"}",
 			},
 			want: "smartgrid/bat_01/power",
@@ -191,8 +228,10 @@ func TestProcessStanza(t *testing.T) {
 		Body: "",
 	}
 
-	err := mockConfig.serversUp(t)
+	mock, err := mockConfig.serversUp(t)
 	ok(t, err)
+
+	defer mock.Stop()
 
 	for i, tt := range tests {
 
@@ -238,13 +277,13 @@ func TestProcessStanza(t *testing.T) {
 
 }
 
-// func equals(tb testing.TB, exp, act interface{}) {
-// 	if !reflect.DeepEqual(exp, act) {
-// 		_, file, line, _ := runtime.Caller(1)
-// 		fmt.Printf("\n\033[31m%s:%d:\n\n\texp: %#v\n\n\tgot: %#v\033[39m\n\n", filepath.Base(file), line, exp, act)
-// 		tb.FailNow()
-// 	}
-// }
+func equals(tb testing.TB, exp, act interface{}) {
+	if !reflect.DeepEqual(exp, act) {
+		_, file, line, _ := runtime.Caller(1)
+		fmt.Printf("\n\033[31m%s:%d:\n\n\texp: %#v\n\n\tgot: %#v\033[39m\n\n", filepath.Base(file), line, exp, act)
+		tb.FailNow()
+	}
+}
 
 func ok(tb testing.TB, err error) {
 	if err != nil {
@@ -254,7 +293,7 @@ func ok(tb testing.TB, err error) {
 	}
 }
 
-func (sc *StaticConfig) serversUp(t *testing.T) error {
+func (sc *StaticConfig) serversUp(t *testing.T) (*xmpp.ServerMock, error) {
 
 	sc.mqttMessageStack = make(map[string]string)
 	sc.xmppMessageStack = make(map[xco.Address][]string)
@@ -306,8 +345,8 @@ func (sc *StaticConfig) serversUp(t *testing.T) error {
 	case <-waitCh:
 		fmt.Println("XMPP and MQTT ready")
 	case <-time.After(5 * time.Second):
-		return errors.New("Connection exceeded timeout. Aborting")
+		return nil, errors.New("Connection exceeded timeout. Aborting")
 	}
 
-	return nil
+	return &mock, nil
 }
