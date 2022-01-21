@@ -80,19 +80,20 @@ func main() {
 
 	for {
 		select {
-		//case _ = <-gatewayDead: ANTON
 		case <-gatewayDead:
 			log.Printf("Gateway died. Restarting")
 			gatewayDead = sc.runGatewayProcess()
 		case <-mqttDead:
-
 			log.Printf("MQTT client died. Restarting")
 			mqttDead = sc.runMqttProcess()
+			<-sc.mqttReadyCh
+			fmt.Println("MQTT ready!")
 		case <-xmppDead:
 			log.Printf("XMPP died. Restarting")
 			time.Sleep(1 * time.Second)
 			xmppDead = sc.runXmppProcess()
-
+			<-sc.mqttReadyCh
+			fmt.Println("XMPPready!")
 		}
 	}
 }

@@ -15,8 +15,8 @@
 #           this component connects.
 # - port: port on which the XMPP server is listening for components. Prosody defaults to 5347
 [xmpp]
-name="mqtt.gateway.com"
-secret="mysecretcomponentpassword"
+name="component.quobismartgrid.com"
+secret="secret"
 host="127.0.0.1"
 port=5347
 #
@@ -30,7 +30,7 @@ port=5347
 # - port: port on which to listen for MQTT requests.
 [mqtt]
 broker="localhost"
-port=1883
+port=8883
 clientID="clientGateway"
 username="guest"
 password="guest"

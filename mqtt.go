@@ -1,7 +1,10 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
@@ -70,8 +73,7 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 	//mqtt.DEBUG = log.New(os.Stdout, "[DEBUG] ", 0)
 
 	//check values!!!!
-	opts.AddBroker(fmt.Sprintf(c.Url))
-	opts.SetClientID(c.ClientID)
+	opts.AddBroker("ssl://" + fmt.Sprintf(c.Url))
 	opts.SetUsername(c.Username)
 	opts.SetPassword(c.Password)
 
@@ -89,6 +91,10 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 		fmt.Println("Connected to MQTT broker")
 		sc.mqttReadyCh <- true
 	}
+
+	//tls configuration
+	tlsConfig := NewTlsConfig()
+	opts.SetClientID(c.ClientID).SetTLSConfig(tlsConfig)
 
 	opts.OnConnect = c.connectHandler
 
@@ -141,7 +147,42 @@ func (c *mqttClient) runMqttClient(sc *StaticConfig) <-chan struct{} {
 func NewMessageID() uint16 {
 	rand.Seed(time.Now().UnixNano())
 	return uint16(rand.Intn(65536))
+}
 
+func NewTlsConfig() *tls.Config {
+	certpool := x509.NewCertPool()
+	ca, err := ioutil.ReadFile("./certs/ca_certificate.pem")
+	if err != nil {
+		certpool.AppendCertsFromPEM(ca)
+	}
+	// Import client certificate/key pair
+	cert, err := tls.LoadX509KeyPair("./certs/client_certificate.pem", "./certs/client_key.pem")
+	if err != nil {
+		panic(err)
+	}
+	// // Just to print out the client certificate..
+	// cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// fmt.Println(cert.Leaf)
+
+	// Create tls.Config with desired tls properties
+	return &tls.Config{
+		// RootCAs = certs used to verify server cert.
+		RootCAs: certpool,
+		// ClientAuth = whether to request cert from server.
+		// Since the server is set up for SSL, this happens
+		// anyways.
+		ClientAuth: tls.NoClientCert,
+		// ClientCAs = certs used to validate client cert.
+		ClientCAs: nil,
+		// InsecureSkipVerify = verify that cert contents
+		// match server. IP matches what is in cert etc.
+		InsecureSkipVerify: true,
+		// Certificates = list of certs client sends to server.
+		Certificates: []tls.Certificate{cert},
+	}
 }
 
 // func (c *mqttClient) onReceivedMessage(x *xco.Component, m *xco.Message) error {
