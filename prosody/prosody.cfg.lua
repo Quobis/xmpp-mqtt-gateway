@@ -39,9 +39,10 @@ modules_enabled = {
 	-- Generally required
 		"roster"; -- Allow users to have a roster. Recommended ;)
 		"saslauth"; -- Authentication for clients and servers. Recommended if you want to log in.
-		"tls"; -- Add support for secure TLS on c2s/s2s connections
+		--"tls"; -- Add support for secure TLS on c2s/s2s connections
 		"dialback"; -- s2s dialback support
 		"disco"; -- Service discovery
+		"stanza_debug";
 
 	-- Not essential, but recommended
 		"carbons"; -- Keep multiple clients in sync
@@ -90,6 +91,12 @@ modules_disabled = {
 	-- "posix"; -- POSIX functionality, sends server to background, enables syslog, etc.
 }
 
+-- ssl = {
+--     key = "/etc/prosody/certs/server_key.pem";
+--     certificate = "/etc/prosody/certs/server_certificate.pem";
+--     protocol = "tlsv1+"
+-- }
+
 -- Disable account creation by default, for security
 -- For more information see https://prosody.im/doc/creating_accounts
 allow_registration = true
@@ -103,6 +110,9 @@ c2s_require_encryption = false
 -- prevent servers from authenticating unless they are using encryption.
 
 s2s_require_encryption = false
+
+allow_anonymous_c2s = true
+allow_unencrypted_plain_auth = true
 
 -- Force certificate authentication for server-to-server connections?
 
@@ -159,6 +169,8 @@ archive_expires_after = "1w" -- Remove archived messages after 1 week
 -- For advanced logging see https://prosody.im/doc/logging
 log = {
     {levels = {min = "debug"}, to = "console"};
+	error = "/var/log/prosody/prosody.err";
+	debug = "/var/log/prosody/prosody.log";
 }
 
 component_interfaces = { "0.0.0.0" }
@@ -183,12 +195,9 @@ component_interfaces = { "0.0.0.0" }
 ----------- Virtual hosts -----------
 -- You need to add a VirtualHost entry for each domain you wish Prosody to serve.
 -- Settings under each VirtualHost entry apply *only* to that host.
-VirtualHost "chat.gateway.com"
+VirtualHost "quobismartgrid.com"
 	enabled = true
-	-- ssl = {
-	-- 	key = "/etc/prosody/certs/chat.gateway.com.key";
-	-- 	certificate = "/etc/prosody/certs/chat.gateway.com.crt";
-	-- }
+	
 
 --VirtualHost "example.com"
 	--certificate = "/etc/prosody/certs/anton.crt"
@@ -209,12 +218,13 @@ VirtualHost "chat.gateway.com"
 -- transports to other networks like ICQ, MSN and Yahoo. For more info
 -- see: https://prosody.im/doc/components#adding_an_external_component
 --
-Component "mqtt.gateway.com" --"muc"
+Component "component.quobismartgrid.com" --"muc"
 	--modules_enabled = { "mam_muc "}
 	--storage = { muc_log = "sql"}
-	component_secret = "mysecretcomponentpassword"
-	-- ssl = {
-	-- 	key = "/etc/prosody/certs/mqtt.anton.key";
-	-- 	certificate = "/etc/prosody/certs/mqtt.anton.crt"
-	-- }
-	--certificate = "/etc/prosody/certs/mqtt.anton.crt"
+	component_secret = "secret"
+
+--     ssl = {
+--     key = "/etc/prosody/certs/client_key.pem";
+--     certificate = "/etc/prosody/certs/client_certificate.pem";
+--     protocol = "tlsv1"
+-- }

@@ -61,9 +61,7 @@ func (c *Component) runXmppComponent(sc *StaticConfig) <-chan struct{} {
 			err = x.Run()
 		}()
 		sc.xmppReadyCh <- true
-		if err == nil {
-			fmt.Println("Client xmpp connected.")
-		} else {
+		if err != nil {
 			log.Printf("lost XMPP connection:%s", err)
 		}
 
