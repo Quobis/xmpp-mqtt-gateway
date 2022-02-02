@@ -30,7 +30,7 @@ port=5347
 # - port: port on which to listen for MQTT requests.
 [mqtt]
 broker="localhost"
-port=8883
+port=8885
 clientID="clientGateway"
 username="guest"
 password="guest"
