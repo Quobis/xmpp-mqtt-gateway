@@ -6,7 +6,6 @@ require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/eclipse/paho.mqtt.golang v1.3.5
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
-	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/pkg/errors v0.8.1
 	//	github.com/BurntSushi/toml v0.3.1
 	//	github.com/gorilla/mux v1.7.4

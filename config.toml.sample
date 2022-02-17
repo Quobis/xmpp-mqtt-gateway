@@ -34,7 +34,7 @@ port=8885
 clientID="clientGateway"
 username="guest"
 password="guest"
-
+# CHANGED FOR TESTING
 #
 #Sippo Server
 #
@@ -48,6 +48,6 @@ password="guest"
 #           to retrieve all meetings.
 # - password: password associated with the user.
 [sipposerver]
-host="https://web.sippo"
-user="admin@quobis"
-password="myadminpassword"
+host="https://testing.quobis.com/collaborator/"
+user="mark5"
+password="mark5"
