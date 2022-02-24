@@ -23,8 +23,8 @@ import (
 )
 
 type StaticConfig struct {
-	config Config
-	//sippoClient *SippoClient
+	config      Config
+	sippoClient *SippoClient
 
 	//	provider  p.Provider
 	xmppComponent Component
@@ -40,16 +40,6 @@ type StaticConfig struct {
 	mqttMessageStack map[string]string
 }
 
-// type xmppPair struct {
-// 	from  *xco.Address
-// 	topic string
-// }
-
-// type mqttPair struct {
-// 	topic   string
-// 	content string
-// }
-
 func main() {
 
 	var config Config
@@ -60,7 +50,7 @@ func main() {
 		os.Exit(1)
 	}
 	sc := &StaticConfig{config: config}
-	//sc.sippoClient, err = sc.setSippoServer()
+	sc.sippoClient, err = sc.setSippoServer()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Wrong configuration: %s\n", err)
 		os.Exit(1)
@@ -128,7 +118,7 @@ func (sc *StaticConfig) runGatewayProcess() <-chan struct{} {
 					log.Printf("Error receiving mqtt msg: %s", err)
 				}
 
-				fmt.Printf("%v", sc.mqttMessageStack)
+				//fmt.Printf("%v", sc.mqttMessageStack)
 
 			}
 			log.Println("***************gateway looping******************")
@@ -255,6 +245,7 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) (*xco.Message, error
 	// Given a possibly complex JSON object
 	msg := string((*message).Payload())
 
+	//Use case 1:	GET devices
 	//we could list devices based on the "type" field
 	if strings.Compare(topic_raw[1], "listOfDevices") == 0 {
 
@@ -269,36 +260,45 @@ func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) (*xco.Message, error
 
 	} else {
 
-		// We only know our top-level keys are strings
-		mp := make(map[string]interface{})
-
-		// Decode JSON into our map
-		err := json.Unmarshal([]byte(msg), &mp)
-		if err != nil {
-			println(err)
-			return nil, err
-		}
-
+		//Use case 3:	GET "variable" "device"
 		//If the topic has the format (smartgrid/device_id/variable)
 		if len(topic_raw) == 3 {
 
-			//Battery || Thermostat || Solar_kit: device_id
-			//Type field needs to be included and not nil
-			if mp["type"] != nil {
-				text += fmt.Sprintf("%v", mp["type"]) + ": " + topic_raw[1] + "\n"
-			} else {
-				text += "Device" + ": " + topic_raw[1] + "\n"
+			// We only know our top-level keys are strings
+			mp := make(map[string]interface{})
+
+			// Decode JSON into our map
+			err := json.Unmarshal([]byte(msg), &mp)
+			if err != nil {
+				println(err)
+				return nil, err
 			}
+
+			//Battery || Thermostat || Solar_kit: device_id
+			text += "Device" + ": " + topic_raw[1] + "\n"
 
 			text += "\t" + topic_raw[2] + ": " + fmt.Sprintf("%v", mp[topic_raw[2]])
 
 		} else {
 
+			//Use case 2:	GET values "device"
+
+			var jsonArray []map[string]interface{}
+
+			// Decode JSON into our map
+			err := json.Unmarshal([]byte(msg), &jsonArray)
+			if err != nil {
+				println(err)
+				return nil, err
+			}
+
 			// Iterate the map
-			// Note: that mp has to be deferenced here or range will fail
+			// Note: mp has to be deferenced here or range will fail
 			text += topic_raw[1] + ":\n"
-			for key, value := range mp {
-				text += "\t" + string(key) + " : " + fmt.Sprintf("%v", value) + "\n"
+			for _, value := range jsonArray {
+				for key, valuex := range value {
+					text += "\t" + string(key) + " : " + fmt.Sprintf("%v", valuex) + "\n"
+				}
 			}
 		}
 	}
@@ -356,19 +356,19 @@ func (sc *StaticConfig) getAddresses(topic string) []xco.Address {
 	return addresses
 }
 
-// func (sc *StaticConfig) setSippoServer() (*SippoClient, error) {
+func (sc *StaticConfig) setSippoServer() (*SippoClient, error) {
 
-// 	if sc.config.SippoServer != nil {
-// 		auth := &Auth{
-// 			GrantType: "password",
-// 			Username:  sc.config.SippoServer.User,
-// 			Password:  sc.config.SippoServer.Password,
-// 		}
-// 		ss := &SippoClient{
-// 			Host: sc.config.SippoServer.Host,
-// 			Auth: *auth,
-// 		}
-// 		return ss, nil
-// 	}
-// 	return nil, errors.New("Need to configure Sippo Server")
-// }
+	if sc.config.SippoServer != nil {
+		auth := &Auth{
+			GrantType: "password",
+			Username:  sc.config.SippoServer.User,
+			Password:  sc.config.SippoServer.Password,
+		}
+		ss := &SippoClient{
+			Host: sc.config.SippoServer.Host,
+			Auth: *auth,
+		}
+		return ss, nil
+	}
+	return nil, errors.New("Need to configure Sippo Server")
+}

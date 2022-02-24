@@ -6,7 +6,7 @@ services:
     ports:
       - "5672:5672" # amqp protocol
       - "5671:5671" # ssl listeners
-      - "1883:1883" # mqtt protocol
+     # - "1883:1883" # mqtt protocol
       - "8883:8883" # mqtts protocol
       # - "8443:8443" # openssl test
       - "15672:15672"  # webui -> user and pass = guest
@@ -22,6 +22,7 @@ services:
     ports:
       - "5347:5347" # xmpp-component
       - "5222:5222" # xmpp-server
+      - "1177:1177" #unit-tests"
       # - "5333:5333" # tls(test)
     extra_hosts:
       - "quobismartgrid.com:0.0.0.0"
