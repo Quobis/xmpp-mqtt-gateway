@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 
@@ -155,13 +156,15 @@ func (sc *StaticConfig) runMqttProcess() <-chan struct{} {
 func (sc *StaticConfig) processStanza(stanza *xco.Message) (*xco.Message, error) {
 
 	topic := "smartgrid/"
+	err := errors.New("")
 
 	xgwAdr := &xco.Address{
 		DomainPart: sc.config.Xmpp.Name,
 	}
 
 	if len(stanza.Body) == 0 {
-		return nil, errors.New("Not processing empty stanza! ")
+		errors.Wrap(err, "Not processing empty stanza! ")
+		return nil, err
 	}
 	body_raw := strings.Split(stanza.Body, " ")
 
@@ -188,7 +191,7 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) (*xco.Message, error)
 				break
 			}
 
-			return nil, errors.New("Bad formatting on the topic")
+			errors.Wrap(err, "Bad formatting on the topic")
 
 		}
 
@@ -217,11 +220,18 @@ func (sc *StaticConfig) processStanza(stanza *xco.Message) (*xco.Message, error)
 
 		returnStanza := sc.xmppComponent.createStanza(xgwAdr, stanza.From, sc.mqttMessageStack[topic])
 		return returnStanza, sc.xmppComponent.xmppComponent.Send(returnStanza)
-
 	}
 
-	//not standard message, ignoring it
-	return nil, errors.New("Wrong xmpp body format.")
+	//not standard message, senfing usage manual
+
+	usage, _ := ioutil.ReadFile("usageManual.txt")
+
+	fmt.Println(string(usage))
+
+	returnStanzaBody := "Bad message, here is a tip: \n\n" + string(usage)
+
+	returnStanza := sc.xmppComponent.createStanza(xgwAdr, stanza.From, returnStanzaBody)
+	return returnStanza, sc.xmppComponent.xmppComponent.Send(returnStanza)
 }
 
 func (sc *StaticConfig) mqttToStanza(message *mqtt.Message) (*xco.Message, error) {
