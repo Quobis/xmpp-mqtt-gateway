@@ -1,0 +1,7 @@
+There are 3 use cases available, each one attached to the following messages you can write:
+
+1- "GET devices" - This message shows the IoT devices under the topic of smartgrid
+
+2- "GET values " device1 - This message shows the IoT's variables and values of the given device "device1"
+
+3- "GET " variable1 " from " device1 - This message shows one value of the given variable "variable1" under the topic of the given device "device1"

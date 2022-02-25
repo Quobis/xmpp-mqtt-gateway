@@ -1,0 +1,4 @@
+./ioxy \
+   mqtts -mqtts-port 8885 -mqtts-cert ../../certs/server_certificate.pem -mqtts-key ../../certs/server_key.pem -mqtts-ca ../../certs/ca_certificate.pem \
+   broker -mqtt-broker-tls -mqtt-broker-host localhost -mqtt-broker-port 8883 -mqtt-broker-cert ../../certs/client_certificate.pem -mqtt-broker-key ../../certs/client_key.pem \
+   gui

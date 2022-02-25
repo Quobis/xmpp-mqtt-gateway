@@ -73,7 +73,7 @@ func TestMqttToStanza(t *testing.T) {
 			name: "Case values",
 			args: args{
 				topic:   "smartgrid/bat_01",
-				message: "[{\"device_id\":\"bat_01\", \"power\": 1111, \"type\":\"Battery\"}]",
+				message: "[{\"device_id\":\"bat_01\"}, {\"power\": 1111}, {\"type\":\"Battery\"}]",
 			},
 			//this method fails "randomly" probably because of unmarshall (changes the order of the fields)
 			want: "\nbat_01:\n\tdevice_id : bat_01\n\tpower : 1111\n\ttype : Battery\n",
@@ -97,11 +97,11 @@ func TestMqttToStanza(t *testing.T) {
 		Header: xco.Header{
 			From: &xco.Address{
 				LocalPart:  "example",
-				DomainPart: "chat.gateway.com",
+				DomainPart: "quobismartgrid.com",
 			},
 			To: &xco.Address{
 				LocalPart:  "",
-				DomainPart: "mqtt.gateway.com",
+				DomainPart: "component.quobismartgrid.com",
 			},
 			ID: NewId(),
 		},
@@ -191,7 +191,7 @@ func TestProcessStanza(t *testing.T) {
 			name: "Case values",
 			args: args{
 				topic:   "GET values bat_01",
-				message: "{\"device_id\":\"bat_01\", \"power\": 1111, \"type\":\"Battery\"}",
+				message: "[{\"device_id\":\"bat_01\"}, {\"power\": 1111}, {\"type\":\"Battery\"}]",
 			},
 			want: "smartgrid/bat_01",
 		},
@@ -215,11 +215,11 @@ func TestProcessStanza(t *testing.T) {
 		Header: xco.Header{
 			From: &xco.Address{
 				LocalPart:  "example",
-				DomainPart: "chat.gateway.com",
+				DomainPart: "quobismartgrid.com",
 			},
 			To: &xco.Address{
 				LocalPart:  "",
-				DomainPart: "mqtt.gateway.com",
+				DomainPart: "component.quobismartgrid.com",
 			},
 			ID: NewId(),
 		},
@@ -310,8 +310,8 @@ func (sc *StaticConfig) serversUp(t *testing.T) (*xmpp.ServerMock, error) {
 
 	sc.config.Xmpp = ConfigXmpp{
 		Host:   "localhost",
-		Name:   "mqtt.gateway.com",
-		Port:   1177,
+		Name:   "component.quobismartgrid.com",
+		Port:   5347,
 		Secret: "secret",
 	}
 
