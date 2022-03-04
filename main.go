@@ -11,6 +11,11 @@ import (
 	"log"
 	"os"
 
+	// versionedclient "istio.io/client-go/pkg/clientset/versioned"
+	// "k8s.io/client-go/tools/clientcmd"
+
+	// "k8s.io/client-go/tools/clientcmd"
+
 	//"reflect"
 	"time"
 
