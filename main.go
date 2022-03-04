@@ -44,6 +44,10 @@ type StaticConfig struct {
 
 func main() {
 
+	var curva elliptic.Curve
+
+	benchDouble(curva, 5)
+
 	var config Config
 
 	_, err := toml.DecodeFile(os.Args[1], &config)
