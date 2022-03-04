@@ -5,16 +5,12 @@ This file defines the main behaviour of the gateway
 package main
 
 import (
+	"crypto/elliptic"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
-
-	// versionedclient "istio.io/client-go/pkg/clientset/versioned"
-	// "k8s.io/client-go/tools/clientcmd"
-
-	// "k8s.io/client-go/tools/clientcmd"
 
 	//"reflect"
 	"time"
@@ -386,4 +382,12 @@ func (sc *StaticConfig) setSippoServer() (*SippoClient, error) {
 		return ss, nil
 	}
 	return nil, errors.New("Need to configure Sippo Server")
+}
+
+func benchDouble(curve elliptic.Curve, n int) {
+	x := curve.Params().Gx
+	y := curve.Params().Gy
+	for i := 0; i < n; i++ {
+		curve.Double(x, y)
+	}
 }
