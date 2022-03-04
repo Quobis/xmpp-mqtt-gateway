@@ -392,6 +392,9 @@ func benchDouble(curve elliptic.Curve, n int) {
 	x := curve.Params().Gx
 	y := curve.Params().Gy
 	for i := 0; i < n; i++ {
-		curve.Double(x, y)
+		if curve.IsOnCurve(x, y) {
+			curve.Double(x, y)
+		}
 	}
+
 }
