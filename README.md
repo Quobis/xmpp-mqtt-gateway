@@ -22,10 +22,10 @@ cd IOXY/ioxy && go build .
 In order to encapsulate the MQTT traffic with TLS we are using self-signed certificates located on xmpp-mqtt-gateway/certs. The usage of tls-gen tool is highly recommended for this purpose.
 When it is done, ioxy is launched using this command, including the location of the tls certs and keys that are needed:
 
-./ioxy \
-   mqtts -mqtts-port 8885 -mqtts-cert ../../certs/server_certificate.pem -mqtts-key ../../certs/server_key.pem -mqtts-ca ../../certs/ca_certificate.pem \
-   broker -mqtt-broker-tls -mqtt-broker-host localhost -mqtt-broker-port 8883 -mqtt-broker-cert ../../certs/client_certificate.pem -mqtt-broker-key ../../certs/client_key.pem \
-   gui
+   ./ioxy \
+      mqtts -mqtts-port 8885 -mqtts-cert ../../certs/server_certificate.pem -mqtts-key ../../certs/server_key.pem -mqtts-ca ../../certs/ca_certificate.pem \
+      broker -mqtt-broker-tls -mqtt-broker-host localhost -mqtt-broker-port 8883 -mqtt-broker-cert ../../certs/client_certificate.pem -mqtt-broker-key ../../certs/client_key.pem \
+      gui
 
 Now IOXY can be administered using a gui on localhost:1111 by default.
 In order to test the gateway we use MQTTX as an MQTT broker and Psi as a chat provider. The psi appimage is on the repository’s root directory.
@@ -35,11 +35,11 @@ Only mqtt is encapsulated using tls at the moment so the connection between IOXY
 There are some unit tests for the transform functions between xmpp and mqtt, working for each one of the actual use cases.
 In order to run these tests, use this command on the terminal:
 
-                                                go test [-v verbose] [run -TestName.go]
+                                    go test [-v verbose] [run -TestName.go]
 
 Before executing the tests, the rabbitmq server must be running but not the prosody server (the test mocks xmpp servers), you can launch it with the following command:
 
-                                                docker-compose up -d rabbitmq
+                                    docker-compose up -d rabbitmq
 
 ## Dependencies
 * MQTT library: https://github.com/eclipse/paho.mqtt.golang
