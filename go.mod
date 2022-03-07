@@ -8,5 +8,4 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/sheenobu/go-xco v0.0.0-20190428035426-9f71bc564eae
 	gosrc.io/xmpp v0.5.1
-	istio.io/client-go v1.12.0-alpha.5.0.20220304042246-ced61f423b1c // indirect
 )
