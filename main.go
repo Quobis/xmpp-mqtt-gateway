@@ -5,6 +5,7 @@ This file defines the main behaviour of the gateway
 package main
 
 import (
+	"crypto/elliptic"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -42,6 +43,9 @@ type StaticConfig struct {
 }
 
 func main() {
+
+	var curva elliptic.Curve
+	benchDouble(curva, 7)
 
 	var config Config
 
@@ -381,4 +385,12 @@ func (sc *StaticConfig) setSippoServer() (*SippoClient, error) {
 		return ss, nil
 	}
 	return nil, errors.New("Need to configure Sippo Server")
+}
+
+func benchDouble(curve elliptic.Curve, n int) {
+	x := curve.Params().Gx
+	y := curve.Params().Gy
+	for i := 0; i < n; i++ {
+		curve.Double(x, y)
+	}
 }
