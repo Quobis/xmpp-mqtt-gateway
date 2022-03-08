@@ -1,0 +1,50 @@
+version: "3"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.8-management
+    ports:
+      - "5672:5672" # amqp protocol
+      - "5671:5671" # ssl listeners
+     # - "1883:1883" # mqtt protocol
+      - "8883:8883" # mqtts protocol
+      # - "8443:8443" # openssl test
+      - "15672:15672"  # webui -> user and pass = guest
+    volumes:
+      - ./rabbit/enabled_plugins:/etc/rabbitmq/enabled_plugins
+      - ./rabbit/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - ./rabbit/cert/:/etc/rabbitmq/cert
+#    - ./rabbit/advanced.config:/etc/rabbitmq/advanced.config
+#    - ./rabbit/rabbitmq-env.conf:/etc/rabbitmq/rabbitmq-env.conf
+
+  prosody:
+    image: prosody/prosody
+    ports:
+      - "5347:5347" # xmpp-component
+      - "5222:5222" # xmpp-server
+      - "1177:1177" #unit-tests"
+      # - "5333:5333" # tls(test)
+    extra_hosts:
+      - "quobismartgrid.com:0.0.0.0"
+      - "component.quobismartgrid.com:0.0.0.0"
+    volumes:
+      # - "prosody/certs:/etc/prosody/certs"
+      - "./prosody:/etc/prosody:rw"
+      - "./prosody/logs:/var/log/prosody"
+      - "./prosody/prosody.sqlite:/var/lib/prosody/prosody.sqlite:rw"
+    networks:
+      - net
+
+  x-m-gateway: 
+    build: .
+    networks:
+      net:
+       ipv4_address: 172.10.0.2
+
+networks:
+  net:
+    ipam:
+      driver: default
+      config:
+       - subnet: 172.10.0.0/16
+         gateway: 172.10.0.1

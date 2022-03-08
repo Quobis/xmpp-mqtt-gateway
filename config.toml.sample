@@ -17,7 +17,7 @@
 [xmpp]
 name="component.quobismartgrid.com"
 secret="secret"
-host="127.0.0.1"
+host="172.10.0.3"
 port=5347
 #
 # MQTT broker details
@@ -29,7 +29,7 @@ port=5347
 #           for MQTT requests.
 # - port: port on which to listen for MQTT requests.
 [mqtt]
-broker="localhost"
+broker="172.10.0.1"
 port=8885
 clientID="clientGateway"
 username="guest"
