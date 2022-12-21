@@ -7,5 +7,6 @@ require (
 	github.com/eclipse/paho.mqtt.golang v1.3.5
 	github.com/pkg/errors v0.9.1
 	github.com/sheenobu/go-xco v0.0.0-20190428035426-9f71bc564eae
+	golang.org/x/text v0.5.0 // indirect
 	gosrc.io/xmpp v0.5.1
 )
